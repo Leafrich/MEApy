@@ -73,33 +73,3 @@ x = np.arange(1, 5, 0.001)
 y = list()
 
 plot_analog_stream_channel(electrode_stream, 7, from_in_s=0, to_in_s=300)
-
-# sampling rate
-rate = 10000
-ts = 1.0 / rate
-t = np.arange(0, 300, ts)
-
-electrodeID = 63
-
-# get the signal
-rootDir = os.path.dirname(os.path.abspath(__file__))
-D5data = f'{rootDir}\\Cx_data.h5'
-file = McsPy.McsData.RawData(D5data)
-electrode_stream = file.recordings[0].analog_streams[0]
-ids = [c.channel_id for c in electrode_stream.channel_infos.values()]
-signal = electrode_stream.get_channel_in_range(ids[electrodeID], 0, len(t) - 1)
-
-signalArray = np.array(signal[0])
-
-# for i in range(0, len(signalArray)):
-#     signalArray[i] = signalArray[i] * 10000000
-
-signalIntArray = (np.ceil(signalArray)).astype(int)
-write('Cx_test.mp3', rate, signalArray * 10000)
-
-plt.figure(figsize=(16, 5))
-plt.plot(t, signalArray, 'g', linewidth=0.05)
-plt.ylabel('Amplitude')
-
-plt.xlabel('Time (s)')
-plt.show()
