@@ -191,18 +191,18 @@ post = 0.002  # 2 ms
 cutouts = extract_waveforms(signal, fs, spks, pre, post)
 print("Cutout array shape: " + str(cutouts.shape))  # number of spikes x number of samples
 
-plot_waveforms(cutouts, fs, pre, post, n=500)
+# plot_waveforms(cutouts, fs, pre, post, n=500)
 
 min_amplitude = np.amin(cutouts, axis=1)
 max_amplitude = np.amax(cutouts, axis=1)
 
-_ = plt.figure(figsize=(8, 8))
-_ = plt.plot(min_amplitude * 1e6, max_amplitude * 1e6, '.')
-_ = plt.xlabel('Min. Amplitude (%s)' % ureg.uV)
-_ = plt.ylabel('Max. Amplitude (%s)' % ureg.uV)
-_ = plt.title('Min/Max Spike Amplitudes')
-
-plt.show()
+# _ = plt.figure(figsize=(8, 8))
+# _ = plt.plot(min_amplitude * 1e6, max_amplitude * 1e6, '.')
+# _ = plt.xlabel('Min. Amplitude (%s)' % ureg.uV)
+# _ = plt.ylabel('Max. Amplitude (%s)' % ureg.uV)
+# _ = plt.title('Min/Max Spike Amplitudes')
+#
+# plt.show()
 
 scaler = StandardScaler()
 scaled_cutouts = scaler.fit_transform(cutouts)
@@ -214,23 +214,23 @@ print(pca.explained_variance_ratio_)
 pca.n_components = 3
 transformed_3d = pca.fit_transform(scaled_cutouts)
 
-_ = plt.figure(figsize=(15, 5))
-_ = plt.subplot(1, 3, 1)
-_ = plt.plot(transformed_3d[:, 0], transformed_3d[:, 1], '.')
-_ = plt.xlabel('Principal Component 1')
-_ = plt.ylabel('Principal Component 2')
-_ = plt.title('PC1 vs PC2')
-_ = plt.subplot(1, 3, 2)
-_ = plt.plot(transformed_3d[:, 0], transformed_3d[:, 2], '.')
-_ = plt.xlabel('Principal Component 1')
-_ = plt.ylabel('Principal Component 3')
-_ = plt.title('PC1 vs PC3')
-_ = plt.subplot(1, 3, 3)
-_ = plt.plot(transformed_3d[:, 1], transformed_3d[:, 2], '.')
-_ = plt.xlabel('Principal Component 2')
-_ = plt.ylabel('Principal Component 3')
-_ = plt.title('PC2 vs PC3')
-plt.show()
+# _ = plt.figure(figsize=(15, 5))
+# _ = plt.subplot(1, 3, 1)
+# _ = plt.plot(transformed_3d[:, 0], transformed_3d[:, 1], '.')
+# _ = plt.xlabel('Principal Component 1')
+# _ = plt.ylabel('Principal Component 2')
+# _ = plt.title('PC1 vs PC2')
+# _ = plt.subplot(1, 3, 2)
+# _ = plt.plot(transformed_3d[:, 0], transformed_3d[:, 2], '.')
+# _ = plt.xlabel('Principal Component 1')
+# _ = plt.ylabel('Principal Component 3')
+# _ = plt.title('PC1 vs PC3')
+# _ = plt.subplot(1, 3, 3)
+# _ = plt.plot(transformed_3d[:, 1], transformed_3d[:, 2], '.')
+# _ = plt.xlabel('Principal Component 2')
+# _ = plt.ylabel('Principal Component 3')
+# _ = plt.title('PC2 vs PC3')
+# plt.show()
 
 n_components = 2
 gmm = GaussianMixture(n_components=n_components, n_init=10)
@@ -246,9 +246,9 @@ for i in range(n_components):
     _ = plt.axis('tight')
 plt.show()
 
-_ = plt.figure(figsize=(8,8))
+_ = plt.figure(figsize=(8, 8))
 for i in range(n_components):
     idx = labels == i
     color = plt.rcParams['axes.prop_cycle'].by_key()['color'][i]
-    plot_waveforms(cutouts[idx,:], fs, pre, post, n=100, color=color, show=False)
+    plot_waveforms(cutouts[idx, :], fs, pre, post, n=100, color=color, show=False)
 plt.show()
