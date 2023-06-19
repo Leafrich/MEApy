@@ -8,7 +8,6 @@ from sklearn.mixture import GaussianMixture
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-
 def plot_analog_stream_channel(analog_stream, channel_idx, from_in_s=0, to_in_s=None, show=True):
     """
     Plots data from a single AnalogStream channel
@@ -154,25 +153,28 @@ def plot_waveforms(cutouts, fs, pre, post, n=100, color='k', show=True):
         plt.show()
 
 
-Rate = 50000
+Rate = 10000
+electrode_id = 0
+
+timeStart = 0
+timeStop = 300
+
+stdev = 5
 
 rootDir = os.path.dirname(os.path.abspath(__file__))
-D5data = f'{rootDir}\\Cx_50kHz.h5'
+D5data = f'{rootDir}\\20230520_Hp.h5'
 file = McsPy.McsData.RawData(D5data)
 electrode_stream = file.recordings[0].analog_streams[0]
-
 ids = [c.channel_id for c in electrode_stream.channel_infos.values()]
-channel_id = ids[4]
+channel_id = ids[electrode_id]
+
 info = electrode_stream.channel_infos[channel_id].info
 print("Bandwidth: %s - %s Hz" % (info['HighPassFilterCutOffFrequency'], info['LowPassFilterCutOffFrequency']))
 
 signal = electrode_stream.get_channel_in_range(channel_id, 0, electrode_stream.channel_data.shape[1])[0]
 noise_mad = np.median(np.absolute(signal)) / 0.6745
 print('Noise Estimate by MAD Estimator : {0:g} V'.format(noise_mad))
-spike_threshold = -7 * noise_mad
-
-timeStart = 0
-timeStop = 30
+spike_threshold = -stdev * noise_mad
 
 fs = int(electrode_stream.channel_infos[channel_id].sampling_frequency.magnitude)
 crossings = detect_threshold_crossings(signal, fs, spike_threshold, 0.003)
@@ -182,16 +184,16 @@ timestamps = spks / fs
 range_in_s = (timeStart, timeStop)
 spikes_in_range = timestamps[(timestamps >= range_in_s[0]) & (timestamps <= range_in_s[1])]
 
-# plot_analog_stream_channel(electrode_stream, 4, from_in_s=timeStart, to_in_s=timeStop, show=False)
-# _ = plt.plot(spikes_in_range, [spike_threshold * 1e6] * spikes_in_range.shape[0], 'ro', ms=0.4)
-# plt.show()
+plot_analog_stream_channel(electrode_stream, electrode_id, from_in_s=timeStart, to_in_s=timeStop, show=False)
+_ = plt.plot(spikes_in_range, [spike_threshold * 1e6] * spikes_in_range.shape[0], 'ro', ms=0.4)
+plt.show()
 
 pre = 0.001  # 1 ms
 post = 0.002  # 2 ms
 cutouts = extract_waveforms(signal, fs, spks, pre, post)
 print("Cutout array shape: " + str(cutouts.shape))  # number of spikes x number of samples
 
-# plot_waveforms(cutouts, fs, pre, post, n=500)
+plot_waveforms(cutouts, fs, pre, post, n=500)
 
 min_amplitude = np.amin(cutouts, axis=1)
 max_amplitude = np.amax(cutouts, axis=1)
