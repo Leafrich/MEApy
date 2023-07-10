@@ -3,12 +3,14 @@ import McsPy.McsData
 from McsPy import ureg, Q_
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
 
 from sklearn.mixture import GaussianMixture
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-def plot_analog_stream_channel(analog_stream, channel_idx, from_in_s=0, to_in_s=None, show=True):
+
+def plot_analog_stream_channel(analog_stream, channel_idx, from_in_s=0, to_in_s=None, show=False):
     """
     Plots data from a single AnalogStream channel
 
@@ -77,6 +79,52 @@ def detect_threshold_crossings(signal, fs, threshold, dead_time):
     return threshold_crossings
 
 
+def detect_threshold_crossings_max(signal, fs, threshold, dead_time):
+    """
+    Detect threshold crossings in a signal with dead time and return them as an array
+
+    The signal transitions from a sample above the threshold to a sample below the threshold for a detection and
+    the last detection has to be more than dead_time apart from the current one.
+
+    :param signal: The signal as a 1-dimensional numpy array
+    :param fs: The sampling frequency in Hz
+    :param threshold: The threshold for the signal
+    :param dead_time: The dead time in seconds.
+    """
+    dead_time_idx = dead_time * fs
+    threshold_crossings = np.diff((signal >= threshold).astype(int) > 0).nonzero()[0]
+    distance_sufficient = np.insert(np.diff(threshold_crossings) >= dead_time_idx, 0, True)
+    while not np.all(distance_sufficient):
+        # repeatedly remove all threshold crossings that violate the dead_time
+        threshold_crossings = threshold_crossings[distance_sufficient]
+        distance_sufficient = np.insert(np.diff(threshold_crossings) >= dead_time_idx, 0, True)
+    return threshold_crossings
+
+
+def detect_distance_minmax(spikes, fs, dead_time):
+    """
+    Work in progress
+    Combine and detect sufficient distance between min and max spikes not to recount the same spikes
+
+    :param min threshold crossings array
+    :param max threshold crossings array
+    :param fs: The sampling frequency in Hz
+    :param dead_time: The dead time in seconds.
+    """
+    dead_time_idx = dead_time * fs
+    unique_crossing = np.sort(spikes)
+    distance_sufficient = np.insert(np.diff(unique_crossing) >= dead_time_idx, 0, True)
+
+    print(unique_crossing[1:10])
+
+    while not np.all(distance_sufficient):
+        # repeatedly remove all threshold crossings that violate the dead_time
+        unique_crossing = unique_crossing[distance_sufficient]
+        distance_sufficient = np.insert(np.diff(unique_crossing) >= dead_time_idx, 0, True)
+
+    return unique_crossing
+
+
 def get_next_minimum(signal, index, max_samples_to_search):
     """
     Returns the index of the next minimum in the signal after an index
@@ -90,6 +138,19 @@ def get_next_minimum(signal, index, max_samples_to_search):
     return index + min_idx
 
 
+def get_next_maximum(signal, index, max_samples_to_search):
+    """
+    Returns the index of the next minimum in the signal after an index
+
+    :param signal: The signal as a 1-dimensional numpy array
+    :param index: The scalar index
+    :param max_samples_to_search: The number of samples to search for a minimum after the index
+    """
+    search_end_idx = min(index + max_samples_to_search, signal.shape[0])
+    max_idx = np.argmax(signal[index:search_end_idx])
+    return index + max_idx
+
+
 def align_to_minimum(signal, fs, threshold_crossings, search_range):
     """
     Returns the index of the next negative spike peak for all threshold crossings
@@ -101,6 +162,20 @@ def align_to_minimum(signal, fs, threshold_crossings, search_range):
     """
     search_end = int(search_range * fs)
     aligned_spikes = [get_next_minimum(signal, t, search_end) for t in threshold_crossings]
+    return np.array(aligned_spikes)
+
+
+def align_to_maximum(signal, fs, threshold_crossings, search_range):
+    """
+    Returns the index of the next negative spike peak for all threshold crossings
+
+    :param signal: The signal as a 1-dimensional numpy array
+    :param fs: The sampling frequency in Hz
+    :param threshold_crossings: The array of indices where the signal crossed the detection threshold
+    :param search_range: The maximum duration in seconds to search for the minimum after each crossing
+    """
+    search_end = int(search_range * fs)
+    aligned_spikes = [get_next_maximum(signal, t, search_end) for t in threshold_crossings]
     return np.array(aligned_spikes)
 
 
@@ -122,6 +197,12 @@ def extract_waveforms(signal, fs, spikes_idx, pre, post):
             cutout = signal[(index - pre_idx):(index + post_idx)]
             cutouts.append(cutout)
     return np.stack(cutouts)
+
+
+def smooth(y, box_pts):
+    box = np.ones(box_pts) / box_pts
+    y_smooth = np.convolve(y, box, mode='same')
+    return y_smooth
 
 
 def plot_waveforms(cutouts, fs, pre, post, n=100, color='k', show=True):
@@ -153,16 +234,16 @@ def plot_waveforms(cutouts, fs, pre, post, n=100, color='k', show=True):
         plt.show()
 
 
-Rate = 10000
-electrode_id = 0
+Rate = 50000
+electrode_id = 7
 
 timeStart = 0
 timeStop = 300
 
-stdev = 5
+stdev = 7
 
 rootDir = os.path.dirname(os.path.abspath(__file__))
-D5data = f'{rootDir}\\20230520_Hp.h5'
+D5data = f'{rootDir}\\20230530_Cortex_pMEA.h5'
 file = McsPy.McsData.RawData(D5data)
 electrode_stream = file.recordings[0].analog_streams[0]
 ids = [c.channel_id for c in electrode_stream.channel_infos.values()]
@@ -178,18 +259,23 @@ spike_threshold = -stdev * noise_mad
 
 fs = int(electrode_stream.channel_infos[channel_id].sampling_frequency.magnitude)
 crossings = detect_threshold_crossings(signal, fs, spike_threshold, 0.003)
+crossings_max = detect_threshold_crossings_max(signal, fs, -spike_threshold, 0.003)
 spks = align_to_minimum(signal, fs, crossings, 0.002)
+spks_max = align_to_maximum(signal, fs, crossings, 0.002)
 
-timestamps = spks / fs
-range_in_s = (timeStart, timeStop)
-spikes_in_range = timestamps[(timestamps >= range_in_s[0]) & (timestamps <= range_in_s[1])]
+spks = np.sort(np.append(spks, spks_max))
+spks = detect_distance_minmax(spks, fs, 0.001)
 
-plot_analog_stream_channel(electrode_stream, electrode_id, from_in_s=timeStart, to_in_s=timeStop, show=False)
-_ = plt.plot(spikes_in_range, [spike_threshold * 1e6] * spikes_in_range.shape[0], 'ro', ms=0.4)
-plt.show()
+# timestamps = spks / fs
+# range_in_s = (timeStart, timeStop)
+# spikes_in_range = timestamps[(timestamps >= range_in_s[0]) & (timestamps <= range_in_s[1])]
+#
+# plot_analog_stream_channel(electrode_stream, electrode_id, from_in_s=timeStart, to_in_s=timeStop, show=False)
+# _ = plt.plot(spikes_in_range, [spike_threshold * 1e6] * spikes_in_range.shape[0], 'ro', ms=0.4)
+# plt.show()
 
-pre = 0.001  # 1 ms
-post = 0.002  # 2 ms
+pre = 0.002
+post = 0.002
 cutouts = extract_waveforms(signal, fs, spks, pre, post)
 print("Cutout array shape: " + str(cutouts.shape))  # number of spikes x number of samples
 
