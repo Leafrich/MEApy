@@ -106,8 +106,7 @@ def detect_distance_minmax(spikes, fs, dead_time):
     Work in progress
     Combine and detect sufficient distance between min and max spikes not to recount the same spikes
 
-    :param min threshold crossings array
-    :param max threshold crossings array
+    :param spikes: spike timing array
     :param fs: The sampling frequency in Hz
     :param dead_time: The dead time in seconds.
     """
@@ -200,8 +199,8 @@ def smooth(y, str):
     """
     Plot an overlay of spike cutouts
 
-    :param Array: of signal
-    :param Strength: between range of 1-8
+    :param y: array of signal
+    :param str: between range of 1-8
     """
 
     box = np.ones(str) / str
@@ -229,7 +228,7 @@ def plot_waveforms(cutouts, fs, pre, post, n=100, color='k', show=True):
         _ = plt.figure(figsize=(12, 6))
 
     for i in range(n):
-        _ = plt.plot(time_in_us, cutouts[i,] * 1e6, color, linewidth=0.9, alpha=0.5)
+        _ = plt.plot(time_in_us, cutouts[i, ] * 1e6, color, linewidth=0.9, alpha=0.5)
         _ = plt.xlabel('Time (%s)' % ureg.ms)
         _ = plt.ylabel('Voltage (%s)' % ureg.uV)
         _ = plt.title('Cutouts')
@@ -314,6 +313,10 @@ plot_waveforms(cutouts, fs, pre, post, n=500)
 # _ = plt.title('Min/Max Spike Amplitudes')
 #
 # plt.show()
+
+"""
+PCA analysis
+"""
 
 scaler = StandardScaler()
 scaled_cutouts = scaler.fit_transform(cutouts)
