@@ -3,12 +3,14 @@ import McsPy.McsData
 from McsPy import ureg, Q_
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
 
 from sklearn.mixture import GaussianMixture
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-def plot_analog_stream_channel(analog_stream, channel_idx, from_in_s=0, to_in_s=None, show=True):
+
+def plot_analog_stream_channel(analog_stream, channel_idx, from_in_s=0, to_in_s=None, show=False):
     """
     Plots data from a single AnalogStream channel
 
@@ -55,7 +57,7 @@ def plot_analog_stream_channel(analog_stream, channel_idx, from_in_s=0, to_in_s=
         plt.show()
 
 
-def detect_threshold_crossings(signal, fs, threshold, dead_time):
+def detect_threshold_falling_crossings(signal, fs, threshold, dead_time):
     """
     Detect threshold crossings in a signal with dead time and return them as an array
 
@@ -77,6 +79,49 @@ def detect_threshold_crossings(signal, fs, threshold, dead_time):
     return threshold_crossings
 
 
+def detect_threshold_rising_crossings(signal, fs, threshold, dead_time):
+    """
+    Detect threshold crossings in a signal with dead time and return them as an array
+
+    The signal transitions from a sample above the threshold to a sample below the threshold for a detection and
+    the last detection has to be more than dead_time apart from the current one.
+
+    :param signal: The signal as a 1-dimensional numpy array
+    :param fs: The sampling frequency in Hz
+    :param threshold: The threshold for the signal
+    :param dead_time: The dead time in seconds.
+    """
+    dead_time_idx = dead_time * fs
+    threshold_crossings = np.diff((signal >= threshold).astype(int) > 0).nonzero()[0]
+    distance_sufficient = np.insert(np.diff(threshold_crossings) >= dead_time_idx, 0, True)
+    while not np.all(distance_sufficient):
+        # repeatedly remove all threshold crossings that violate the dead_time
+        threshold_crossings = threshold_crossings[distance_sufficient]
+        distance_sufficient = np.insert(np.diff(threshold_crossings) >= dead_time_idx, 0, True)
+    return threshold_crossings
+
+
+def detect_distance_minmax(spikes, fs, dead_time):
+    """
+    Work in progress
+    Combine and detect sufficient distance between min and max spikes not to recount the same spikes
+
+    :param min threshold crossings array
+    :param max threshold crossings array
+    :param fs: The sampling frequency in Hz
+    :param dead_time: The dead time in seconds.
+    """
+    dead_time_idx = dead_time * fs
+    unique_crossing = np.sort(spikes)
+    distance_sufficient = np.insert(np.diff(unique_crossing) >= dead_time_idx, 0, True)
+    while not np.all(distance_sufficient):
+        # repeatedly remove all threshold crossings that violate the dead_time
+        unique_crossing = unique_crossing[distance_sufficient]
+        distance_sufficient = np.insert(np.diff(unique_crossing) >= dead_time_idx, 0, True)
+
+    return unique_crossing
+
+
 def get_next_minimum(signal, index, max_samples_to_search):
     """
     Returns the index of the next minimum in the signal after an index
@@ -90,6 +135,19 @@ def get_next_minimum(signal, index, max_samples_to_search):
     return index + min_idx
 
 
+def get_next_maximum(signal, index, max_samples_to_search):
+    """
+    Returns the index of the next minimum in the signal after an index
+
+    :param signal: The signal as a 1-dimensional numpy array
+    :param index: The scalar index
+    :param max_samples_to_search: The number of samples to search for a minimum after the index
+    """
+    search_end_idx = min(index + max_samples_to_search, signal.shape[0])
+    max_idx = np.argmax(signal[index:search_end_idx])
+    return index + max_idx
+
+
 def align_to_minimum(signal, fs, threshold_crossings, search_range):
     """
     Returns the index of the next negative spike peak for all threshold crossings
@@ -101,6 +159,20 @@ def align_to_minimum(signal, fs, threshold_crossings, search_range):
     """
     search_end = int(search_range * fs)
     aligned_spikes = [get_next_minimum(signal, t, search_end) for t in threshold_crossings]
+    return np.array(aligned_spikes)
+
+
+def align_to_maximum(signal, fs, threshold_crossings, search_range):
+    """
+    Returns the index of the next negative spike peak for all threshold crossings
+
+    :param signal: The signal as a 1-dimensional numpy array
+    :param fs: The sampling frequency in Hz
+    :param threshold_crossings: The array of indices where the signal crossed the detection threshold
+    :param search_range: The maximum duration in seconds to search for the minimum after each crossing
+    """
+    search_end = int(search_range * fs)
+    aligned_spikes = [get_next_maximum(signal, t, search_end) for t in threshold_crossings]
     return np.array(aligned_spikes)
 
 
@@ -124,6 +196,19 @@ def extract_waveforms(signal, fs, spikes_idx, pre, post):
     return np.stack(cutouts)
 
 
+def smooth(y, str):
+    """
+    Plot an overlay of spike cutouts
+
+    :param Array: of signal
+    :param Strength: between range of 1-8
+    """
+
+    box = np.ones(str) / str
+    y_smooth = np.convolve(y, box, mode='same')
+    return y_smooth
+
+
 def plot_waveforms(cutouts, fs, pre, post, n=100, color='k', show=True):
     """
     Plot an overlay of spike cutouts
@@ -144,7 +229,7 @@ def plot_waveforms(cutouts, fs, pre, post, n=100, color='k', show=True):
         _ = plt.figure(figsize=(12, 6))
 
     for i in range(n):
-        _ = plt.plot(time_in_us, cutouts[i,] * 1e6, color, linewidth=0.8, alpha=0.3)
+        _ = plt.plot(time_in_us, cutouts[i,] * 1e6, color, linewidth=0.9, alpha=0.5)
         _ = plt.xlabel('Time (%s)' % ureg.ms)
         _ = plt.ylabel('Voltage (%s)' % ureg.uV)
         _ = plt.title('Cutouts')
@@ -153,51 +238,75 @@ def plot_waveforms(cutouts, fs, pre, post, n=100, color='k', show=True):
         plt.show()
 
 
-Rate = 10000
-electrode_id = 0
-
+Rate = 50000
+electrode_id = 4
 timeStart = 0
 timeStop = 300
 
-stdev = 5
-
 rootDir = os.path.dirname(os.path.abspath(__file__))
-D5data = f'{rootDir}\\20230520_Hp.h5'
+D5data = f'{rootDir}\\Cx_50kHz.h5'
 file = McsPy.McsData.RawData(D5data)
 electrode_stream = file.recordings[0].analog_streams[0]
 ids = [c.channel_id for c in electrode_stream.channel_infos.values()]
 channel_id = ids[electrode_id]
 
 info = electrode_stream.channel_infos[channel_id].info
-print("Bandwidth: %s - %s Hz" % (info['HighPassFilterCutOffFrequency'], info['LowPassFilterCutOffFrequency']))
+
+print("-----------------------------------------------------------")
+print("Sampling frequency : %s Hz" % electrode_stream.channel_infos[channel_id].sampling_frequency.magnitude)
+print("Bandwidth : %s - %s Hz" % (info['HighPassFilterCutOffFrequency'], info['LowPassFilterCutOffFrequency']))
+print("-----------------------------------------------------------")
 
 signal = electrode_stream.get_channel_in_range(channel_id, 0, electrode_stream.channel_data.shape[1])[0]
+
+# for i in range(len(ids)):
+#     plot_analog_stream_channel(electrode_stream, i, from_in_s=timeStart, to_in_s=timeStop, show=False)
+#     plt.show()
+
 noise_mad = np.median(np.absolute(signal)) / 0.6745
-print('Noise Estimate by MAD Estimator : {0:g} V'.format(noise_mad))
-spike_threshold = -stdev * noise_mad
+
+falling_threshold = -6 * noise_mad
+rising_threshold = 6 * noise_mad
+
+print('Threshold : {0:g} V'.format(rising_threshold))
+print('Threshold : {0:g} V'.format(falling_threshold), "\n")
 
 fs = int(electrode_stream.channel_infos[channel_id].sampling_frequency.magnitude)
-crossings = detect_threshold_crossings(signal, fs, spike_threshold, 0.003)
-spks = align_to_minimum(signal, fs, crossings, 0.002)
+falling_crossings = detect_threshold_falling_crossings(signal, fs, falling_threshold, 0.003)
+rising_crossings = detect_threshold_rising_crossings(signal, fs, rising_threshold, 0.003)
+spks_fall = align_to_minimum(signal, fs, falling_crossings, 0.002)
+spks_rise = align_to_maximum(signal, fs, rising_crossings, 0.002)
 
-timestamps = spks / fs
+print("Rising edge spike count : %s" % len(spks_rise))
+print("Falling edge spike count : %s" % len(spks_fall))
+
+spks = np.sort(np.append(spks_fall, spks_rise))
+spks = detect_distance_minmax(spks, fs, 0.003)
+
+ts_rise = spks_rise / fs
+ts_fall = spks_fall / fs
 range_in_s = (timeStart, timeStop)
-spikes_in_range = timestamps[(timestamps >= range_in_s[0]) & (timestamps <= range_in_s[1])]
+falling_in_range = ts_fall[(ts_fall >= range_in_s[0]) & (ts_fall <= range_in_s[1])]
+rising_in_range = ts_rise[(ts_rise >= range_in_s[0]) & (ts_rise <= range_in_s[1])]
 
 plot_analog_stream_channel(electrode_stream, electrode_id, from_in_s=timeStart, to_in_s=timeStop, show=False)
-_ = plt.plot(spikes_in_range, [spike_threshold * 1e6] * spikes_in_range.shape[0], 'ro', ms=0.4)
+_ = plt.plot(falling_in_range, [falling_threshold * 1e6] * falling_in_range.shape[0], 'bo', ms=0.4)
+_ = plt.plot(rising_in_range, [rising_threshold * 1e6] * rising_in_range.shape[0], 'ro', ms=0.4)
 plt.show()
 
-pre = 0.001  # 1 ms
-post = 0.002  # 2 ms
+pre = 0.002
+post = 0.002
 cutouts = extract_waveforms(signal, fs, spks, pre, post)
-print("Cutout array shape: " + str(cutouts.shape))  # number of spikes x number of samples
+print("Spike count : " + str(len(cutouts)))
+print(np.shape(cutouts))
+
+print("-----------------------------------------------------------")
 
 plot_waveforms(cutouts, fs, pre, post, n=500)
 
-min_amplitude = np.amin(cutouts, axis=1)
-max_amplitude = np.amax(cutouts, axis=1)
-
+# min_amplitude = np.amin(cutouts, axis=1)
+# max_amplitude = np.amax(cutouts, axis=1)
+#
 # _ = plt.figure(figsize=(8, 8))
 # _ = plt.plot(min_amplitude * 1e6, max_amplitude * 1e6, '.')
 # _ = plt.xlabel('Min. Amplitude (%s)' % ureg.uV)
@@ -211,32 +320,41 @@ scaled_cutouts = scaler.fit_transform(cutouts)
 
 pca = PCA()
 pca.fit(scaled_cutouts)
-print(pca.explained_variance_ratio_)
+print("Explained variance per principal component : ")
+print("Explained variance component 0 : %s " % (pca.explained_variance_ratio_[0] * 100))
+print("Combined explained variance component 0:1 : %s " % (np.sum(pca.explained_variance_ratio_[0:2]) * 100))
+print("Combined explained variance component 0:2 : %s " % (np.sum(pca.explained_variance_ratio_[0:3]) * 100))
+print("Combined explained variance component 0:3 : %s " % (np.sum(pca.explained_variance_ratio_[0:4]) * 100))
+print("Combined explained variance component 0:4 : %s " % (np.sum(pca.explained_variance_ratio_[0:5]) * 100))
 
-pca.n_components = 3
+pca.n_components = 2
 transformed_3d = pca.fit_transform(scaled_cutouts)
 
-# _ = plt.figure(figsize=(15, 5))
-# _ = plt.subplot(1, 3, 1)
-# _ = plt.plot(transformed_3d[:, 0], transformed_3d[:, 1], '.')
-# _ = plt.xlabel('Principal Component 1')
-# _ = plt.ylabel('Principal Component 2')
-# _ = plt.title('PC1 vs PC2')
-# _ = plt.subplot(1, 3, 2)
-# _ = plt.plot(transformed_3d[:, 0], transformed_3d[:, 2], '.')
-# _ = plt.xlabel('Principal Component 1')
-# _ = plt.ylabel('Principal Component 3')
-# _ = plt.title('PC1 vs PC3')
-# _ = plt.subplot(1, 3, 3)
-# _ = plt.plot(transformed_3d[:, 1], transformed_3d[:, 2], '.')
-# _ = plt.xlabel('Principal Component 2')
-# _ = plt.ylabel('Principal Component 3')
-# _ = plt.title('PC2 vs PC3')
-# plt.show()
+_ = plt.figure(figsize=(15, 5))
+_ = plt.subplot(1, 3, 1)
+_ = plt.plot(transformed_3d[:, 0], transformed_3d[:, 1], '.')
+_ = plt.xlabel('Principal Component 1')
+_ = plt.ylabel('Principal Component 2')
+_ = plt.title('PC1 vs PC2')
+_ = plt.subplot(1, 3, 2)
+_ = plt.plot(transformed_3d[:, 0], transformed_3d[:, 2], '.')
+_ = plt.xlabel('Principal Component 1')
+_ = plt.ylabel('Principal Component 3')
+_ = plt.title('PC1 vs PC3')
+_ = plt.subplot(1, 3, 3)
+_ = plt.plot(transformed_3d[:, 1], transformed_3d[:, 2], '.')
+_ = plt.xlabel('Principal Component 2')
+_ = plt.ylabel('Principal Component 3')
+_ = plt.title('PC2 vs PC3')
+plt.show()
 
-n_components = 2
+n_components = int(input("n principal components : "))
+
 gmm = GaussianMixture(n_components=n_components, n_init=10)
 labels = gmm.fit_predict(transformed_3d)
+
+# print(np.shape(transformed_3d))
+# print(transformed_3d)
 
 _ = plt.figure(figsize=(8, 8))
 for i in range(n_components):
@@ -248,7 +366,7 @@ for i in range(n_components):
     _ = plt.axis('tight')
 plt.show()
 
-_ = plt.figure(figsize=(8, 8))
+_ = plt.figure(figsize=(12, 6))
 for i in range(n_components):
     idx = labels == i
     color = plt.rcParams['axes.prop_cycle'].by_key()['color'][i]
