@@ -229,7 +229,7 @@ def plot_waveforms(cutouts, fs, pre, post, n=100, color='k', show=True):
         _ = plt.figure(figsize=(12, 6))
 
     for i in range(n):
-        _ = plt.plot(time_in_us, smooth(cutouts[i,], 6) * 1e6, color, linewidth=0.8, alpha=0.3)
+        _ = plt.plot(time_in_us, cutouts[i,] * 1e6, color, linewidth=0.9, alpha=0.5)
         _ = plt.xlabel('Time (%s)' % ureg.ms)
         _ = plt.ylabel('Voltage (%s)' % ureg.uV)
         _ = plt.title('Cutouts')
@@ -239,13 +239,12 @@ def plot_waveforms(cutouts, fs, pre, post, n=100, color='k', show=True):
 
 
 Rate = 50000
-electrode_id = 7
-
+electrode_id = 4
 timeStart = 0
 timeStop = 300
 
 rootDir = os.path.dirname(os.path.abspath(__file__))
-D5data = f'{rootDir}\\20230530_Cortex_pMEA.h5'
+D5data = f'{rootDir}\\Cx_50kHz.h5'
 file = McsPy.McsData.RawData(D5data)
 electrode_stream = file.recordings[0].analog_streams[0]
 ids = [c.channel_id for c in electrode_stream.channel_infos.values()]
@@ -259,6 +258,11 @@ print("Bandwidth : %s - %s Hz" % (info['HighPassFilterCutOffFrequency'], info['L
 print("-----------------------------------------------------------")
 
 signal = electrode_stream.get_channel_in_range(channel_id, 0, electrode_stream.channel_data.shape[1])[0]
+
+# for i in range(len(ids)):
+#     plot_analog_stream_channel(electrode_stream, i, from_in_s=timeStart, to_in_s=timeStop, show=False)
+#     plt.show()
+
 noise_mad = np.median(np.absolute(signal)) / 0.6745
 
 falling_threshold = -6 * noise_mad
@@ -293,7 +297,8 @@ plt.show()
 pre = 0.002
 post = 0.002
 cutouts = extract_waveforms(signal, fs, spks, pre, post)
-print("Spike count : " + str(len(cutouts)))  # number of spikes x number of samples
+print("Spike count : " + str(len(cutouts)))
+print(np.shape(cutouts))
 
 print("-----------------------------------------------------------")
 
@@ -321,9 +326,8 @@ print("Combined explained variance component 0:1 : %s " % (np.sum(pca.explained_
 print("Combined explained variance component 0:2 : %s " % (np.sum(pca.explained_variance_ratio_[0:3]) * 100))
 print("Combined explained variance component 0:3 : %s " % (np.sum(pca.explained_variance_ratio_[0:4]) * 100))
 print("Combined explained variance component 0:4 : %s " % (np.sum(pca.explained_variance_ratio_[0:5]) * 100))
-print(pca.explained_variance_ratio_)
 
-pca.n_components = 3
+pca.n_components = 2
 transformed_3d = pca.fit_transform(scaled_cutouts)
 
 _ = plt.figure(figsize=(15, 5))
@@ -348,6 +352,9 @@ n_components = int(input("n principal components : "))
 
 gmm = GaussianMixture(n_components=n_components, n_init=10)
 labels = gmm.fit_predict(transformed_3d)
+
+# print(np.shape(transformed_3d))
+# print(transformed_3d)
 
 _ = plt.figure(figsize=(8, 8))
 for i in range(n_components):
