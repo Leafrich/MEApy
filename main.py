@@ -8,6 +8,7 @@ import sys
 from sklearn.mixture import GaussianMixture
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+from sklearn.random_projection import GaussianRandomProjection
 
 
 def plot_analog_stream_channel(analog_stream, channel_idx, from_in_s=0, to_in_s=None, show=False):
@@ -228,7 +229,7 @@ def plot_waveforms(cutouts, fs, pre, post, n=100, color='k', show=True):
         _ = plt.figure(figsize=(12, 6))
 
     for i in range(n):
-        _ = plt.plot(time_in_us, cutouts[i, ] * 1e6, color, linewidth=0.9, alpha=0.5)
+        _ = plt.plot(time_in_us, smooth(cutouts[i,], 2) * 1e6, color, linewidth=0.9, alpha=0.5)
         _ = plt.xlabel('Time (%s)' % ureg.ms)
         _ = plt.ylabel('Voltage (%s)' % ureg.uV)
         _ = plt.title('Cutouts')
@@ -236,14 +237,12 @@ def plot_waveforms(cutouts, fs, pre, post, n=100, color='k', show=True):
     if show:
         plt.show()
 
-
-Rate = 50000
-electrode_id = 4
+electrode_id = 6
 timeStart = 0
 timeStop = 300
 
 rootDir = os.path.dirname(os.path.abspath(__file__))
-D5data = f'{rootDir}\\Cx_50kHz.h5'
+D5data = f'{rootDir}\\20230530_Cortex_pMEA.h5'
 file = McsPy.McsData.RawData(D5data)
 electrode_stream = file.recordings[0].analog_streams[0]
 ids = [c.channel_id for c in electrode_stream.channel_infos.values()]
@@ -262,10 +261,12 @@ signal = electrode_stream.get_channel_in_range(channel_id, 0, electrode_stream.c
 #     plot_analog_stream_channel(electrode_stream, i, from_in_s=timeStart, to_in_s=timeStop, show=False)
 #     plt.show()
 
+
+
 noise_mad = np.median(np.absolute(signal)) / 0.6745
 
-falling_threshold = -6 * noise_mad
-rising_threshold = 6 * noise_mad
+falling_threshold = -5 * noise_mad
+rising_threshold = 5 * noise_mad
 
 print('Threshold : {0:g} V'.format(rising_threshold))
 print('Threshold : {0:g} V'.format(falling_threshold), "\n")
@@ -323,41 +324,41 @@ scaled_cutouts = scaler.fit_transform(cutouts)
 
 pca = PCA()
 pca.fit(scaled_cutouts)
-print("Explained variance per principal component : ")
-print("Explained variance component 0 : %s " % (pca.explained_variance_ratio_[0] * 100))
-print("Combined explained variance component 0:1 : %s " % (np.sum(pca.explained_variance_ratio_[0:2]) * 100))
-print("Combined explained variance component 0:2 : %s " % (np.sum(pca.explained_variance_ratio_[0:3]) * 100))
-print("Combined explained variance component 0:3 : %s " % (np.sum(pca.explained_variance_ratio_[0:4]) * 100))
-print("Combined explained variance component 0:4 : %s " % (np.sum(pca.explained_variance_ratio_[0:5]) * 100))
 
-pca.n_components = 2
+# j = 0
+# n = 0
+# for i in range(len(pca.explained_variance_ratio_)):
+#     j += pca.explained_variance_ratio_[i]
+#     n += 1
+#     if j >= .2:
+#         break
+
 transformed_3d = pca.fit_transform(scaled_cutouts)
+print("Dim transformed %s" % str(np.shape(transformed_3d)))
 
-_ = plt.figure(figsize=(15, 5))
-_ = plt.subplot(1, 3, 1)
-_ = plt.plot(transformed_3d[:, 0], transformed_3d[:, 1], '.')
-_ = plt.xlabel('Principal Component 1')
-_ = plt.ylabel('Principal Component 2')
-_ = plt.title('PC1 vs PC2')
-_ = plt.subplot(1, 3, 2)
-_ = plt.plot(transformed_3d[:, 0], transformed_3d[:, 2], '.')
-_ = plt.xlabel('Principal Component 1')
-_ = plt.ylabel('Principal Component 3')
-_ = plt.title('PC1 vs PC3')
-_ = plt.subplot(1, 3, 3)
-_ = plt.plot(transformed_3d[:, 1], transformed_3d[:, 2], '.')
-_ = plt.xlabel('Principal Component 2')
-_ = plt.ylabel('Principal Component 3')
-_ = plt.title('PC2 vs PC3')
-plt.show()
+# _ = plt.figure(figsize=(15, 5))
+# _ = plt.subplot(1, 3, 1)
+# _ = plt.plot(transformed_3d[:, 0], transformed_3d[:, 1], '.')
+# _ = plt.xlabel('Principal Component 1')
+# _ = plt.ylabel('Principal Component 2')
+# _ = plt.title('PC1 vs PC2')
+# _ = plt.subplot(1, 3, 2)
+# _ = plt.plot(transformed_3d[:, 0], transformed_3d[:, 2], '.')
+# _ = plt.xlabel('Principal Component 1')
+# _ = plt.ylabel('Principal Component 3')
+# _ = plt.title('PC1 vs PC3')
+# _ = plt.subplot(1, 3, 3)
+# _ = plt.plot(transformed_3d[:, 1], transformed_3d[:, 2], '.')
+# _ = plt.xlabel('Principal Component 2')
+# _ = plt.ylabel('Principal Component 3')
+# _ = plt.title('PC2 vs PC3')
+# plt.show()
 
-n_components = int(input("n principal components : "))
+# print("%s Compenents 0.6 variabilty explained" % n)
+n_components = 3
 
 gmm = GaussianMixture(n_components=n_components, n_init=10)
 labels = gmm.fit_predict(transformed_3d)
-
-# print(np.shape(transformed_3d))
-# print(transformed_3d)
 
 _ = plt.figure(figsize=(8, 8))
 for i in range(n_components):
