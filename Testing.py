@@ -5,6 +5,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+# MCS24Dict = {
+#     "0": 0, "1": z, "2": z, "3": 0,
+#     "4": z, "5": z, "6": z, "7": z,
+#     "8": z, "9": -z, "10": -z, "11": -z,
+#     "12": 0, "13": -z, "14": -z, "15": 0,
+# }
+
 def plot_well(analog_streams, channel_idx, from_in_s=0, to_in_s=None, show=False):
     """
     Plots data from a single AnalogStream channel
@@ -35,32 +42,36 @@ def plot_well(analog_streams, channel_idx, from_in_s=0, to_in_s=None, show=False
     scale_factor_for_second = Q_(1, time[1]).to(ureg.s).magnitude
     time_in_sec = time[0] * scale_factor_for_second
 
-    # get the signal
-    signal = analog_streams.get_channel_in_range(channel_id, from_idx, to_idx)
-
     # scale signal to µV:
-    scale_factor_for_uV = Q_(1, signal[1]).to(ureg.uV).magnitude
-    signal_in_uV = signal[0] * scale_factor_for_uV
+    scale_signal = analog_streams.get_channel_in_range(channel_id, from_idx, to_idx)
+    scale_factor_for_uV = Q_(1, scale_signal[1]).to(ureg.uV).magnitude
 
     # construct the plot
-    fig, axs = plt.subplots(4, 4)
-    axs[0, 0].plot(x, y)
-    axs[0, 0].set_title('Axis [0, 0]')
-    axs[0, 1].plot(x, y, 'tab:orange')
-    axs[0, 1].set_title('Axis [0, 1]')
+    fig, pos = plt.subplots(4, 4)
+    pos[0, 0].axis('off')
+    pos[0, 3].axis('off')
+    pos[3, 0].axis('off')
+    pos[3, 3].axis('off')
 
-    axs[1, 0].plot(x, -y, 'tab:green')
-    axs[1, 0].set_title('Axis [1, 0]')
-    axs[1, 1].plot(x, -y, 'tab:red')
-    axs[1, 1].set_title('Axis [1, 1]')
-    _ = plt.plot(time_in_sec, signal_in_uV, linewidth=0.1)
+    n = 0
+    for i in range(4):
+        for j in range(4):
+            if n == 0 or n == 3 or n == 12 or n == 15:
+                n += 1
+                continue
+            print(n)
+            signal = analog_streams.get_channel_in_range(n, from_idx, to_idx)
+            pos[i, j].plot(time_in_sec, signal * scale_factor_for_uV)
+            n += 1
+
     _ = plt.xlabel('Time (%s)' % ureg.s)
     _ = plt.ylabel('Voltage (%s)' % ureg.uV)
-    _ = plt.title('Channel %s' % channel_info.info['Label'])
+    _ = plt.title('Well XX')
     if show:
         plt.show()
 
 
+well_id = 1
 electrode_id = 6
 timeStart = 0
 timeStop = 300
@@ -80,3 +91,5 @@ print("Bandwidth : %s - %s Hz" % (info['HighPassFilterCutOffFrequency'], info['L
 print("-----------------------------------------------------------")
 
 signal = electrode_stream.get_channel_in_range(channel_id, 0, electrode_stream.channel_data.shape[1])[0]
+
+plot_well(electrode_stream, 1, from_in_s=timeStart, to_in_s=timeStop, show=False)

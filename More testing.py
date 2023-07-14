@@ -18,7 +18,7 @@ MCS24Dict = {
     "5": z,
     "6": z,
     "7": z,
-    "8": z,
+    "8": -z,
     "9": -z,
     "10": -z,
     "11": -z,
@@ -39,11 +39,10 @@ pos[3, 3].axis('off')
 n = 0
 for i in range(4):
     for j in range(4):
-        print(n)
         if n == 0 or n == 3 or n == 12 or n == 15:
             n += 1
             continue
-        print(n)
+        print(i, j)
         pos[i, j].plot(y, MCS24Dict.get(str(n)))
         n += 1
 
