@@ -261,8 +261,6 @@ signal = electrode_stream.get_channel_in_range(channel_id, 0, electrode_stream.c
 #     plot_analog_stream_channel(electrode_stream, i, from_in_s=timeStart, to_in_s=timeStop, show=False)
 #     plt.show()
 
-
-
 noise_mad = np.median(np.absolute(signal)) / 0.6745
 
 falling_threshold = -5 * noise_mad
