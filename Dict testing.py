@@ -48,7 +48,7 @@ def plot_well(analog_streams, from_in_s=0, to_in_s=None, show=False):
     scale_signal = analog_streams.get_channel_in_range(channel_id, from_idx, to_idx)
     scale_factor_for_uV = Q_(1, scale_signal[1]).to(ureg.uV).magnitude
 
-    # construct the plot
+    # remove corner plots
     fig, pos = plt.subplots(4, 4)
     pos[0, 0].axis('off')
     pos[0, 3].axis('off')
@@ -70,7 +70,6 @@ def plot_well(analog_streams, from_in_s=0, to_in_s=None, show=False):
         sigDict[i] = sigArray[n]
         n += 1
 
-
     n = 0
     for i in range(4):
         for j in range(4):
@@ -90,7 +89,6 @@ def plot_well(analog_streams, from_in_s=0, to_in_s=None, show=False):
     # _ = plt.ylabel('Voltage (%s)' % ureg.uV)
     if show:
         plt.show()
-
 
 
 well_id = 1
@@ -115,3 +113,5 @@ print("-----------------------------------------------------------")
 signal = electrode_stream.get_channel_in_range(channel_id, 0, electrode_stream.channel_data.shape[1])[0]
 
 plot_well(electrode_stream, from_in_s=timeStart, to_in_s=timeStop, show=True)
+
+print(electrode_stream.get_channel_in_range())

@@ -196,6 +196,19 @@ def extract_waveforms(signal, fs, spikes_idx, pre, post):
     return np.stack(cutouts)
 
 
+def smooth(y, str):
+    """
+    Plot an overlay of spike cutouts
+
+    :param y: array of signal
+    :param str: between range of 1-8
+    """
+
+    box = np.ones(str) / str
+    y_smooth = np.convolve(y, box, mode='same')
+    return y_smooth
+
+
 def plot_waveforms(cutouts, fs, pre, post, n=100, color='k', show=True):
     """
     Plot an overlay of spike cutouts
@@ -216,7 +229,7 @@ def plot_waveforms(cutouts, fs, pre, post, n=100, color='k', show=True):
         _ = plt.figure(figsize=(12, 6))
 
     for i in range(n):
-        _ = plt.plot(time_in_us, cutouts[i,] * 1e6, color, linewidth=0.9, alpha=0.5)
+        _ = plt.plot(time_in_us, smooth(cutouts[i,], 2) * 1e6, color, linewidth=0.9, alpha=0.5)
         _ = plt.xlabel('Time (%s)' % ureg.ms)
         _ = plt.ylabel('Voltage (%s)' % ureg.uV)
         _ = plt.title('Cutouts')
@@ -243,6 +256,10 @@ print("Bandwidth : %s - %s Hz" % (info['HighPassFilterCutOffFrequency'], info['L
 print("-----------------------------------------------------------")
 
 signal = electrode_stream.get_channel_in_range(channel_id, 0, electrode_stream.channel_data.shape[1])[0]
+
+# for i in range(len(ids)):
+#     plot_analog_stream_channel(electrode_stream, i, from_in_s=timeStart, to_in_s=timeStop, show=False)
+#     plt.show()
 
 noise_mad = np.median(np.absolute(signal)) / 0.6745
 
@@ -285,12 +302,75 @@ print("-----------------------------------------------------------")
 
 plot_waveforms(cutouts, fs, pre, post, n=500)
 
+# min_amplitude = np.amin(cutouts, axis=1)
+# max_amplitude = np.amax(cutouts, axis=1)
+#
+# _ = plt.figure(figsize=(8, 8))
+# _ = plt.plot(min_amplitude * 1e6, max_amplitude * 1e6, '.')
+# _ = plt.xlabel('Min. Amplitude (%s)' % ureg.uV)
+# _ = plt.ylabel('Max. Amplitude (%s)' % ureg.uV)
+# _ = plt.title('Min/Max Spike Amplitudes')
+#
+# plt.show()
+
 """
-Data analysis
+PCA analysis
 """
 
-for i in electrode_stream.get_channel_data.shape[0]:
-    ids = [c.channel_id for c in electrode_stream.get_channel_in_range()]
+scaler = StandardScaler()
+scaled_cutouts = scaler.fit_transform(cutouts)
 
+pca = PCA()
+pca.fit(scaled_cutouts)
 
+# j = 0
+# n = 0
+# for i in range(len(pca.explained_variance_ratio_)):
+#     j += pca.explained_variance_ratio_[i]
+#     n += 1
+#     if j >= .2:
+#         break
 
+transformed_3d = pca.fit_transform(scaled_cutouts)
+print("Dim transformed %s" % str(np.shape(transformed_3d)))
+
+# _ = plt.figure(figsize=(15, 5))
+# _ = plt.subplot(1, 3, 1)
+# _ = plt.plot(transformed_3d[:, 0], transformed_3d[:, 1], '.')
+# _ = plt.xlabel('Principal Component 1')
+# _ = plt.ylabel('Principal Component 2')
+# _ = plt.title('PC1 vs PC2')
+# _ = plt.subplot(1, 3, 2)
+# _ = plt.plot(transformed_3d[:, 0], transformed_3d[:, 2], '.')
+# _ = plt.xlabel('Principal Component 1')
+# _ = plt.ylabel('Principal Component 3')
+# _ = plt.title('PC1 vs PC3')
+# _ = plt.subplot(1, 3, 3)
+# _ = plt.plot(transformed_3d[:, 1], transformed_3d[:, 2], '.')
+# _ = plt.xlabel('Principal Component 2')
+# _ = plt.ylabel('Principal Component 3')
+# _ = plt.title('PC2 vs PC3')
+# plt.show()
+
+# print("%s Compenents 0.6 variabilty explained" % n)
+n_components = 3
+
+gmm = GaussianMixture(n_components=n_components, n_init=10)
+labels = gmm.fit_predict(transformed_3d)
+
+_ = plt.figure(figsize=(8, 8))
+for i in range(n_components):
+    idx = labels == i
+    _ = plt.plot(transformed_3d[idx, 0], transformed_3d[idx, 1], '.')
+    _ = plt.title('Cluster assignments by a GMM')
+    _ = plt.xlabel('Principal Component 1')
+    _ = plt.ylabel('Principal Component 2')
+    _ = plt.axis('tight')
+plt.show()
+
+_ = plt.figure(figsize=(12, 6))
+for i in range(n_components):
+    idx = labels == i
+    color = plt.rcParams['axes.prop_cycle'].by_key()['color'][i]
+    plot_waveforms(cutouts[idx, :], fs, pre, post, n=100, color=color, show=False)
+plt.show()
