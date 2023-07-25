@@ -137,7 +137,7 @@ def get_next_minimum(signal, index, max_samples_to_search):
 
 def get_next_maximum(signal, index, max_samples_to_search):
     """
-    Returns the index of the next minimum in the signal after an index
+    Returns the index of the next maximum in the signal after an index
 
     :param signal: The signal as a 1-dimensional numpy array
     :param index: The scalar index
@@ -219,7 +219,7 @@ def plot_waveforms(cutouts, fs, pre, post, n=100, color='k', show=True):
     :param post: The duration of the cutout after the spike in seconds
     :param n: The number of cutouts to plot, or None to plot all. Default: 100
     :param color: The line color as a pyplot line/marker style. Default: 'k'=black
-    :param show: Set this to False to disable showing the plot. Default: True
+    :param show: Set this to: False to disable showing the plot. Default: True
     """
     if n is None:
         n = cutouts.shape[0]
@@ -237,7 +237,8 @@ def plot_waveforms(cutouts, fs, pre, post, n=100, color='k', show=True):
     if show:
         plt.show()
 
-electrode_id = 6
+
+electrode_id = 0
 timeStart = 0
 timeStop = 300
 
@@ -281,15 +282,18 @@ print("Falling edge spike count : %s" % len(spks_fall))
 spks = np.sort(np.append(spks_fall, spks_rise))
 spks = detect_distance_minmax(spks, fs, 0.003)
 
-ts_rise = spks_rise / fs
-ts_fall = spks_fall / fs
+# ts_rise = spks_rise / fs
+# ts_fall = spks_fall / fs
 range_in_s = (timeStart, timeStop)
-falling_in_range = ts_fall[(ts_fall >= range_in_s[0]) & (ts_fall <= range_in_s[1])]
-rising_in_range = ts_rise[(ts_rise >= range_in_s[0]) & (ts_rise <= range_in_s[1])]
+# falling_in_range = ts_fall[(ts_fall >= range_in_s[0]) & (ts_fall <= range_in_s[1])]
+# rising_in_range = ts_rise[(ts_rise >= range_in_s[0]) & (ts_rise <= range_in_s[1])]
+
+ts_spks = spks / fs
+spks_in_range = ts_spks[(ts_spks >= range_in_s[0]) & (ts_spks <= range_in_s[1])]
 
 plot_analog_stream_channel(electrode_stream, electrode_id, from_in_s=timeStart, to_in_s=timeStop, show=False)
-_ = plt.plot(falling_in_range, [falling_threshold * 1e6] * falling_in_range.shape[0], 'bo', ms=0.4)
-_ = plt.plot(rising_in_range, [rising_threshold * 1e6] * rising_in_range.shape[0], 'ro', ms=0.4)
+_ = plt.plot(spks_in_range, [falling_threshold * 1e6] * spks_in_range.shape[0], 'bo', ms=0.4)
+# _ = plt.plot(rising_in_range, [rising_threshold * 1e6] * rising_in_range.shape[0], 'ro', ms=0.4)
 plt.show()
 
 pre = 0.002

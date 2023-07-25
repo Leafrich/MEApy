@@ -113,5 +113,3 @@ print("-----------------------------------------------------------")
 signal = electrode_stream.get_channel_in_range(channel_id, 0, electrode_stream.channel_data.shape[1])[0]
 
 plot_well(electrode_stream, from_in_s=timeStart, to_in_s=timeStop, show=True)
-
-print(electrode_stream.get_channel_in_range())

@@ -44,7 +44,7 @@ def plot_analog_stream_channel(analog_stream, channel_idx, from_in_s=0, to_in_s=
 
     # construct the plot
     _ = plt.figure(figsize=(16, 5))
-    _ = plt.plot(time_in_sec, signal_in_uV, linewidth=0.2)
+    _ = plt.plot(time_in_sec, signal_in_uV, linewidth=0.1)
     _ = plt.xlabel('Time (%s)' % ureg.s)
     _ = plt.ylabel('Voltage (%s)' % ureg.uV)
     _ = plt.title('Channel %s' % channel_info.info['Label'])
@@ -202,52 +202,48 @@ print("-----------------------------------------------------------")
 Start of loop/function
 """
 
-noise_mad = np.median(np.absolute(data_array[3])) / 0.6745
+# for i in range(len(ids)):
+#     plot_analog_stream_channel(electrode_stream, i, from_in_s=timeStart, to_in_s=timeStop, show=False)
+#     plt.show()
 
-falling_threshold = -7 * noise_mad
-rising_threshold = 7 * noise_mad
+noise_mad = np.median(np.absolute(data_array[0])) / 0.6745
 
-print('Threshold : {0:g} V'.format(rising_threshold))
-print('Threshold : {0:g} V'.format(falling_threshold), "\n")
+falling_threshold = -5 * noise_mad
+rising_threshold = 5 * noise_mad
 
-fs = int(stream.channel_infos[ids[3]].sampling_frequency.magnitude)
-falling_crossings = detect_threshold_falling_crossings(data_array[3], fs, falling_threshold, 0.003)
-rising_crossings = detect_threshold_rising_crossings(data_array[3], fs, rising_threshold, 0.003)
-spks_fall = align_to_minimum(data_array[3], fs, falling_crossings, 0.002)
-# spks_rise = align_to_maximum(data_array[3], fs, rising_crossings, 0.002)
+print('Rising Threshold : {0:g} V'.format(rising_threshold))
+print('Falling Threshold : {0:g} V'.format(falling_threshold), "\n")
 
-# print("Rising edge spike count : %s" % len(spks_rise))
+fs = int(stream.channel_infos[ids[0]].sampling_frequency.magnitude)
+falling_crossings = detect_threshold_falling_crossings(data_array[0], fs, falling_threshold, 0.003)
+rising_crossings = detect_threshold_rising_crossings(data_array[0], fs, rising_threshold, 0.003)
+spks_fall = align_to_minimum(data_array[0], fs, falling_crossings, 0.002)
+spks_rise = align_to_maximum(data_array[0], fs, rising_crossings, 0.002)
+
+print("Rising edge spike count : %s" % len(spks_rise))
 print("Falling edge spike count : %s" % len(spks_fall))
 
-# spks = np.sort(np.append(spks_fall, spks_rise))
-spks = detect_distance_minmax(spks_fall, fs, 0.001)
+spks = np.sort(np.append(spks_fall, spks_rise))
+spks = detect_distance_minmax(spks, fs, 0.002)
 
+# ts_rise = spks_rise / fs
+# ts_fall = spks_fall / fs
 range_in_s = (timeStart, timeStop)
+# falling_in_range = ts_fall[(ts_fall >= range_in_s[0]) & (ts_fall <= range_in_s[1])]
+# rising_in_range = ts_rise[(ts_rise >= range_in_s[0]) & (ts_rise <= range_in_s[1])]
 
 ts_spks = spks / fs
 spks_in_range = ts_spks[(ts_spks >= range_in_s[0]) & (ts_spks <= range_in_s[1])]
+
+plot_analog_stream_channel(stream, 0, from_in_s=timeStart, to_in_s=timeStop, show=False)
+_ = plt.plot(spks_in_range, [falling_threshold * 1e6] * spks_in_range.shape[0], 'bo', ms=0.4)
+plt.show()
 
 print("-----------------------------------------------------------")
 # frequency
 fq = len(spks)/(timeStop - timeStart)
 print("Frequency : %s" % round(fq, 2))
 
-print(spks)
 spk_int = np.diff(spks)
-print(spk_int)
-
 _ = np.std(spk_int)/np.mean(spk_int)
 print("Coefficient of variation : %s" % round(_, 2))
-
-print(spk_int[50:60])
-
-plot_analog_stream_channel(stream, 3, from_in_s=timeStart, to_in_s=timeStop, show=False)
-_ = plt.plot(spks_in_range, [falling_threshold * 1e6] * spks_in_range.shape[0], 'bo', ms=0.7, alpha=0.5)
-plt.show()
-
-bursts = []
-for i in range(len(spk_int)):
-    if spk_int[i] < 80:
-        bursts.append(i)
-
-print(bursts)
