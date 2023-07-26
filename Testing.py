@@ -12,7 +12,7 @@ def plot_analog_stream_channel(analog_stream, channel_idx, from_in_s=0, to_in_s=
     :param analog_stream: A AnalogStream object
     :param channel_idx: A scalar channel index (0 <= channel_idx < # channels in the AnalogStream)
     :param from_in_s: The start timestamp of the plot (0 <= from_in_s < to_in_s). Default: 0
-    :param to_in_s: The end timestamp of the plot (from_in_s < to_in_s <= duration). Default: None (= recording duration)
+    :param to_in_s: The end timestamp of the plot (from_in_s < to_in_s <= duration).
     :param show: If True (default), the plot is directly created. For further plotting, use show=False
     """
     # extract basic information
@@ -220,7 +220,7 @@ spks_fall = align_to_minimum(data_array[3], fs, falling_crossings, 0.002)
 print("Falling edge spike count : %s" % len(spks_fall))
 
 # spks = np.sort(np.append(spks_fall, spks_rise))
-spks = detect_distance_minmax(spks_fall, fs, 0.001)
+spks = detect_distance_minmax(spks_fall, fs, 0.0005)
 
 range_in_s = (timeStart, timeStop)
 
@@ -229,25 +229,49 @@ spks_in_range = ts_spks[(ts_spks >= range_in_s[0]) & (ts_spks <= range_in_s[1])]
 
 print("-----------------------------------------------------------")
 # frequency
-fq = len(spks)/(timeStop - timeStart)
+fq = len(spks) / (timeStop - timeStart)
 print("Frequency : %s" % round(fq, 2))
 
 print(spks)
 spk_int = np.diff(spks)
 print(spk_int)
 
-_ = np.std(spk_int)/np.mean(spk_int)
+_ = np.std(spk_int) / np.mean(spk_int)
 print("Coefficient of variation : %s" % round(_, 2))
 
-print(spk_int[50:60])
+array = []
+burst_list = []
+bursts = []
+n = 0
+
+# 50 ms does not return the same bursts as MCS ?
+for i in range(len(spk_int)):
+    if spk_int[i] < 150:
+        j = i
+        while spk_int[j] < 150:
+            array.append(spks[j])
+            j += 1
+            if j >= len(spk_int):
+                break
+        if len(array) >= 4:
+            bursts.append(array)
+            burst_list += array
+            n += 1
+        array = []
+
+ts_total = np.asarray(burst_list) / fs
+bursts_in_range = ts_total[(ts_total >= range_in_s[0]) & (ts_total <= range_in_s[1])]
 
 plot_analog_stream_channel(stream, 3, from_in_s=timeStart, to_in_s=timeStop, show=False)
 _ = plt.plot(spks_in_range, [falling_threshold * 1e6] * spks_in_range.shape[0], 'bo', ms=0.7, alpha=0.5)
+# _ = plt.plot([min(bursts[0]) / fs, max(bursts[0]) / fs], [0, 0], 'r-', alpha=0.9, linewidth='5')
+# _ = plt.hlines(falling_threshold * 1e6, min(bursts[0]) / fs, max(bursts[0]) / fs, colors="r")
+
+# Range does not work yet
+for i in range(len(bursts)):
+    # Drawing a line does not work, because the length is too short ;(
+    burst_dot = np.arange(min(bursts[i]) / fs, max(bursts[i]) / fs, (max(bursts[i]) / fs - min(bursts[i]) / fs) / 100)
+    _ = plt.plot(burst_dot, [2] * len(burst_dot), 'rs', alpha=0.9, ms=0.8)
+    _ = plt.plot(min(bursts[i]) / fs, 0, 'ro', ms=0.7, alpha=0.5)
+
 plt.show()
-
-bursts = []
-for i in range(len(spk_int)):
-    if spk_int[i] < 80:
-        bursts.append(i)
-
-print(bursts)
