@@ -5,10 +5,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
-from sklearn.mixture import GaussianMixture
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-from sklearn.random_projection import GaussianRandomProjection
 
 
 def plot_analog_stream_channel(analog_stream, channel_idx, from_in_s=0, to_in_s=None, show=False):
