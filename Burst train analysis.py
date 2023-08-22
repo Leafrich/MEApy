@@ -83,7 +83,7 @@ print("-----------------------------------------------------------")
 
 fs = int(stream.channel_infos[ids[3]].sampling_frequency.magnitude)
 
-df = pd.read_csv("../Burst analysis.csv")
+df = pd.read_csv("Burst analysis.csv")
 df = df.iloc[:, [1, 3, 9, 10, 11]]
 df['End timestamp [µs]'] = df['Start timestamp [µs]'] + df['Duration [µs]']
 

@@ -12,11 +12,11 @@ df['End timestamp [µs]'] = df['Start timestamp [µs]'] + df['Duration [µs]']
 
 uniNames = pd.unique(df['Experiment'])
 DIVarr = ['DIV10', 'DIV12', 'DIV14', 'DIV18', 'DIV24']
+Dict = {}
 
-for _ in range(len(DIVarr)):
+df['ID'] = df['Well Label'].astype(str) + df['Channel Label'].astype(str)
 
-    for i in range(len(uniNames)):
+for _ in range(len(uniNames)):
+    Dict[DIVarr[_]] = df.loc[df['Experiment'] == uniNames[_], :]
 
-
-
-
+print(Dict['DIV10']['Start timestamp [µs]'])
