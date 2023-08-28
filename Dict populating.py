@@ -19,4 +19,4 @@ df['ID'] = df['Well Label'].astype(str) + df['Channel Label'].astype(str)
 for _ in range(len(uniNames)):
     Dict[DIVarr[_]] = df.loc[df['Experiment'] == uniNames[_], :]
 
-print(Dict['DIV10']['Start timestamp [µs]'])
+print(Dict[0])
