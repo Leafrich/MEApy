@@ -6,7 +6,6 @@ import numpy as np
 import sys
 
 
-
 def plot_analog_stream_channel(analog_stream, channel_idx, from_in_s=0, to_in_s=None, show=False):
     """
     Plots data from a single AnalogStream channel
