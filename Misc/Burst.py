@@ -265,7 +265,7 @@ _ = plt.plot(spks_in_range, [falling_threshold * 1e6] * spks_in_range.shape[0], 
 # _ = plt.plot([min(bursts[0]) / fs, max(bursts[0]) / fs], [0, 0], 'r-', alpha=0.9, linewidth='5')
 # _ = plt.hlines(falling_threshold * 1e6, min(bursts[0]) / fs, max(bursts[0]) / fs, colors="r")
 
-df = pd.read_csv("../Burst analysis.csv")
+df = pd.read_csv("Burst analysis.csv")
 df = df.iloc[:, [1, 9, 10, 11]]
 
 df22 = df.loc[df['Channel Label'] == 22, :]

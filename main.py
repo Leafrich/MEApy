@@ -1,292 +1,223 @@
-import os
-import McsPy.McsData
-from McsPy import ureg, Q_
 import matplotlib.pyplot as plt
+import pandas as pd
 import numpy as np
-import sys
+import os
+import math as mt
+
+pd.set_option('display.max_columns', None)
+pd.set_option("expand_frame_repr", False)
 
 
-
-def plot_analog_stream_channel(analog_stream, channel_idx, from_in_s=0, to_in_s=None, show=False):
-    """
-    Plots data from a single AnalogStream channel
-
-    :param analog_stream: A AnalogStream object
-    :param channel_idx: A scalar channel index (0 <= channel_idx < # channels in the AnalogStream)
-    :param from_in_s: The start timestamp of the plot (0 <= from_in_s < to_in_s). Default: 0
-    :param to_in_s: The end timestamp of the plot (from_in_s < to_in_s <= duration). Default: None (= recording duration)
-    :param show: If True (default), the plot is directly created. For further plotting, use show=False
-    """
-    # extract basic information
-    ids = [c.channel_id for c in analog_stream.channel_infos.values()]
-    channel_id = ids[channel_idx]
-    channel_info = analog_stream.channel_infos[channel_id]
-    sampling_frequency = channel_info.sampling_frequency.magnitude
-
-    # get start and end index
-    from_idx = max(0, int(from_in_s * sampling_frequency))
-    if to_in_s is None:
-        to_idx = analog_stream.channel_data.shape[1]
-    else:
-        to_idx = min(analog_stream.channel_data.shape[1], int(to_in_s * sampling_frequency))
-
-    # get the timestamps for each sample
-    time = analog_stream.get_channel_sample_timestamps(channel_id, from_idx, to_idx)
-
-    # scale time to seconds:
-    scale_factor_for_second = Q_(1, time[1]).to(ureg.s).magnitude
-    time_in_sec = time[0] * scale_factor_for_second
-
-    # get the signal
-    signal = analog_stream.get_channel_in_range(channel_id, from_idx, to_idx)
-
-    # scale signal to µV:
-    scale_factor_for_uV = Q_(1, signal[1]).to(ureg.uV).magnitude
-    signal_in_uV = signal[0] * scale_factor_for_uV
-
-    # construct the plot
-    _ = plt.figure(figsize=(16, 5))
-    _ = plt.plot(time_in_sec, signal_in_uV, linewidth=0.1)
-    _ = plt.xlabel('Time (%s)' % ureg.s)
-    _ = plt.ylabel('Voltage (%s)' % ureg.uV)
-    _ = plt.title('Channel %s' % channel_info.info['Label'])
-    if show:
-        plt.show()
+#----------------------------------------------------------------------------------------------------------------------#
+# Functions
+#----------------------------------------------------------------------------------------------------------------------#
+def in_range(pd_data):
+    burst_in_range = []
+    for k in range(len(pd_data['Channel Label'])):
+        if range_in_s[1] >= pd_data['Start timestamp [µs]'].iloc[k] / 1e6 >= range_in_s[0]:  # start within range
+            if pd_data['End timestamp [µs]'].iloc[k] / 1e6 < range_in_s[1]:  # end within range
+                burst_in_range.append([pd_data['Start timestamp [µs]'].iloc[k],
+                                       pd_data['End timestamp [µs]'].iloc[k]])
+            else:  # start in range/ end not in range
+                burst_in_range.append([pd_data['Start timestamp [µs]'].iloc[k],
+                                       range_in_s[1] * 1e6])
+                break
+        else:  # start not in range
+            if range_in_s[1] >= pd_data['End timestamp [µs]'].iloc[k] / 1e6 >= range_in_s[0]:  # end in range
+                burst_in_range.append([range_in_s[0] * 1e6, pd_data['End timestamp [µs]'].iloc[k]])
+    return burst_in_range
 
 
-def detect_threshold_falling_crossings(signal, fs, threshold, dead_time):
-    """
-    Detect threshold crossings in a signal with dead time and return them as an array
+def sep_bursts(data):
+    bur_int = [j for sub in data for j in sub]  # flatten data into 1D
+    bur_int = np.diff(bur_int)  # calculate diff between bursts
+    slBurst = []  # new burst interval array
+    for n in range(len(bur_int)):  # seperate burst- and interburst intervals
+        if n % 2 != 0:
+            slBurst.append(bur_int[n])
 
-    The signal transitions from a sample above the threshold to a sample below the threshold for a detection and
-    the last detection has to be more than dead_time apart from the current one.
-
-    :param signal: The signal as a 1-dimensional numpy array
-    :param fs: The sampling frequency in Hz
-    :param threshold: The threshold for the signal
-    :param dead_time: The dead time in seconds.
-    """
-    dead_time_idx = dead_time * fs
-    threshold_crossings = np.diff((signal <= threshold).astype(int) > 0).nonzero()[0]
-    distance_sufficient = np.insert(np.diff(threshold_crossings) >= dead_time_idx, 0, True)
-    while not np.all(distance_sufficient):
-        # repeatedly remove all threshold crossings that violate the dead_time
-        threshold_crossings = threshold_crossings[distance_sufficient]
-        distance_sufficient = np.insert(np.diff(threshold_crossings) >= dead_time_idx, 0, True)
-    return threshold_crossings
+    array = []  # temp storage array
+    sep_bur = []
+    for m in range(int(len(slBurst))):
+        array.append(data[m])
+        if slBurst[m] > 500000:
+            sep_bur.append(array)
+            array = []
+    return sep_bur
+    # burst_array.append(sep_bur)
 
 
-def detect_threshold_rising_crossings(signal, fs, threshold, dead_time):
-    """
-    Detect threshold crossings in a signal with dead time and return them as an array
+def sep_bursts(data):
+    bur_int = [j for sub in data for j in sub]  # flatten data into 1D
+    bur_int = np.diff(bur_int)  # calculate diff between bursts
+    slBurst = []  # new burst interval array
+    for n in range(len(bur_int)):  # seperate burst- and interburst intervals
+        if n % 2 != 0:
+            slBurst.append(bur_int[n])
 
-    The signal transitions from a sample above the threshold to a sample below the threshold for a detection and
-    the last detection has to be more than dead_time apart from the current one.
+    array = []  # temp storage array
+    sep_bur = []
+    for m in range(int(len(slBurst))):
+        array.append(data[m])
+        if slBurst[m] > 500000:
+            sep_bur.append(array)
+            array = []
+    return sep_bur
 
-    :param signal: The signal as a 1-dimensional numpy array
-    :param fs: The sampling frequency in Hz
-    :param threshold: The threshold for the signal
-    :param dead_time: The dead time in seconds.
-    """
-    dead_time_idx = dead_time * fs
-    threshold_crossings = np.diff((signal >= threshold).astype(int) > 0).nonzero()[0]
-    distance_sufficient = np.insert(np.diff(threshold_crossings) >= dead_time_idx, 0, True)
-    while not np.all(distance_sufficient):
-        # repeatedly remove all threshold crossings that violate the dead_time
-        threshold_crossings = threshold_crossings[distance_sufficient]
-        distance_sufficient = np.insert(np.diff(threshold_crossings) >= dead_time_idx, 0, True)
-    return threshold_crossings
+#----------------------------------------------------------------------------------------------------------------------#
+# Variable setup
+#----------------------------------------------------------------------------------------------------------------------#
+range_in_s = (0, 300)  # range to be analysed in seconds [s]
+allWells = ["A4", "A5", "B5", "C4", "C5", "D4", "D5"]
+allElectrodes = [12, 13, 21, 22, 23, 24, 31, 32, 33, 34, 42, 43]
+allDIVs = ['DIV04', 'DIV06', 'DIV08', 'DIV10', 'DIV12', 'DIV14', 'DIV18', 'DIV24']
 
-
-def detect_distance_minmax(spikes, fs, dead_time):
-    """
-    Work in progress
-    Combine and detect sufficient distance between min and max spikes not to recount the same spikes
-
-    :param spikes: spike timing array
-    :param fs: The sampling frequency in Hz
-    :param dead_time: The dead time in seconds.
-    """
-    dead_time_idx = dead_time * fs
-    unique_crossing = np.sort(spikes)
-    distance_sufficient = np.insert(np.diff(unique_crossing) >= dead_time_idx, 0, True)
-    while not np.all(distance_sufficient):
-        # repeatedly remove all threshold crossings that violate the dead_time
-        unique_crossing = unique_crossing[distance_sufficient]
-        distance_sufficient = np.insert(np.diff(unique_crossing) >= dead_time_idx, 0, True)
-
-    return unique_crossing
-
-
-def get_next_minimum(signal, index, max_samples_to_search):
-    """
-    Returns the index of the next minimum in the signal after an index
-
-    :param signal: The signal as a 1-dimensional numpy array
-    :param index: The scalar index
-    :param max_samples_to_search: The number of samples to search for a minimum after the index
-    """
-    search_end_idx = min(index + max_samples_to_search, signal.shape[0])
-    min_idx = np.argmin(signal[index:search_end_idx])
-    return index + min_idx
-
-
-def get_next_maximum(signal, index, max_samples_to_search):
-    """
-    Returns the index of the next minimum in the signal after an index
-
-    :param signal: The signal as a 1-dimensional numpy array
-    :param index: The scalar index
-    :param max_samples_to_search: The number of samples to search for a minimum after the index
-    """
-    search_end_idx = min(index + max_samples_to_search, signal.shape[0])
-    max_idx = np.argmax(signal[index:search_end_idx])
-    return index + max_idx
-
-
-def align_to_minimum(signal, fs, threshold_crossings, search_range):
-    """
-    Returns the index of the next negative spike peak for all threshold crossings
-
-    :param signal: The signal as a 1-dimensional numpy array
-    :param fs: The sampling frequency in Hz
-    :param threshold_crossings: The array of indices where the signal crossed the detection threshold
-    :param search_range: The maximum duration in seconds to search for the minimum after each crossing
-    """
-    search_end = int(search_range * fs)
-    aligned_spikes = [get_next_minimum(signal, t, search_end) for t in threshold_crossings]
-    return np.array(aligned_spikes)
-
-
-def align_to_maximum(signal, fs, threshold_crossings, search_range):
-    """
-    Returns the index of the next negative spike peak for all threshold crossings
-
-    :param signal: The signal as a 1-dimensional numpy array
-    :param fs: The sampling frequency in Hz
-    :param threshold_crossings: The array of indices where the signal crossed the detection threshold
-    :param search_range: The maximum duration in seconds to search for the minimum after each crossing
-    """
-    search_end = int(search_range * fs)
-    aligned_spikes = [get_next_maximum(signal, t, search_end) for t in threshold_crossings]
-    return np.array(aligned_spikes)
-
-
-def extract_waveforms(signal, fs, spikes_idx, pre, post):
-    """
-    Extract spike waveforms as signal cutouts around each spike index as a spikes x samples numpy array
-
-    :param signal: The signal as a 1-dimensional numpy array
-    :param fs: The sampling frequency in Hz
-    :param spikes_idx: The sample index of all spikes as a 1-dim numpy array
-    :param pre: The duration of the cutout before the spike in seconds
-    :param post: The duration of the cutout after the spike in seconds
-    """
-    cutouts = []
-    pre_idx = int(pre * fs)
-    post_idx = int(post * fs)
-    for index in spikes_idx:
-        if index - pre_idx >= 0 and index + post_idx <= signal.shape[0]:
-            cutout = signal[(index - pre_idx):(index + post_idx)]
-            cutouts.append(cutout)
-    return np.stack(cutouts)
-
-
-def plot_waveforms(cutouts, fs, pre, post, n=100, color='k', show=True):
-    """
-    Plot an overlay of spike cutouts
-
-    :param cutouts: A spikes x samples array of cutouts
-    :param fs: The sampling frequency in Hz
-    :param pre: The duration of the cutout before the spike in seconds
-    :param post: The duration of the cutout after the spike in seconds
-    :param n: The number of cutouts to plot, or None to plot all. Default: 100
-    :param color: The line color as a pyplot line/marker style. Default: 'k'=black
-    :param show: Set this to False to disable showing the plot. Default: True
-    """
-    if n is None:
-        n = cutouts.shape[0]
-    n = min(n, cutouts.shape[0])
-    time_in_us = np.arange(-pre * 1000, post * 1000, 1e3 / fs)
-    if show:
-        _ = plt.figure(figsize=(12, 6))
-
-    for i in range(n):
-        _ = plt.plot(time_in_us, cutouts[i,] * 1e6, color, linewidth=0.9, alpha=0.5)
-        _ = plt.xlabel('Time (%s)' % ureg.ms)
-        _ = plt.ylabel('Voltage (%s)' % ureg.uV)
-        _ = plt.title('Cutouts')
-
-    if show:
-        plt.show()
-
-electrode_id = 6
-timeStart = 0
-timeStop = 300
+wellrainbow = np.array(["#FF0000", "#FF7F00", "#FFFF00", "#00FF00", "#0000FF", "#4B0082", "#9400D3"])
 
 rootDir = os.path.dirname(os.path.abspath(__file__))
-D5data = f'{rootDir}\\20230530_Cortex_pMEA.h5'
-file = McsPy.McsData.RawData(D5data)
-electrode_stream = file.recordings[0].analog_streams[0]
-ids = [c.channel_id for c in electrode_stream.channel_infos.values()]
-channel_id = ids[electrode_id]
 
-info = electrode_stream.channel_infos[channel_id].info
+#----------------------------------------------------------------------------------------------------------------------#
+# Spike dataframe construction
+#----------------------------------------------------------------------------------------------------------------------#
+# reading in spike data from the MCS software as csv into a pandas dataframe
+spkdf = pd.read_csv(f'{rootDir}\\Hippocampus spk analysis.csv')
+spkdf = spkdf.iloc[:, [1, 3, 6, 9]]  # Channel Label, Well Label, Experiment, Timestamp
 
-print("-----------------------------------------------------------")
-print("Sampling frequency : %s Hz" % electrode_stream.channel_infos[channel_id].sampling_frequency.magnitude)
-print("Bandwidth : %s - %s Hz" % (info['HighPassFilterCutOffFrequency'], info['LowPassFilterCutOffFrequency']))
-print("-----------------------------------------------------------")
+uniNames = pd.unique(spkdf['Experiment'])
+# work around for this experiment, further experiments need to be done with DIV easily slicable from the experiment col
+spkdf['DIV'] = ['DIV04' if x == '20230516_Hippocampus_pMEA_001' else
+                'DIV06' if x == '20230518_Hippocampus_pMEA_001' else
+                'DIV08' if x == '20230520_Hippocampus_pMEA_001' else
+                'DIV10' if x == '20230522_Hippocampus_pMEA_001' else
+                'DIV12' if x == '20230524_Hippocampus_pMEA_001' else
+                'DIV14' if x == '20230526_Hippocampus_pMEA_001' else
+                'DIV18' if x == '20230530_Hippocampus_pMEA_001' else
+                'DIV24' if x == '20230605_Hippocampus_pMEA_001' else 'nan' for x in spkdf["Experiment"]]
 
-signal = electrode_stream.get_channel_in_range(channel_id, 0, electrode_stream.channel_data.shape[1])[0]
+# Create a DataFrame with all possible combinations of dc, wc, and ec
+combos = pd.DataFrame([(dc, wc, ec) for dc in allDIVs for wc in allWells for ec in allElectrodes],
+                      columns=["DIV", "Well Label", "Channel Label"])
+missing_combos = pd.merge(combos, spkdf, on=["DIV", "Well Label", "Channel Label"], how="left") # Merge to find missing combinations
+missing_combos = missing_combos[missing_combos.isnull().any(axis=1)]
+spkdf = pd.concat([spkdf, missing_combos], ignore_index=True, sort=False)
 
-noise_mad = np.median(np.absolute(signal)) / 0.6745
+active = 0
+FFdf = pd.DataFrame(columns=["Electrode", "Well", "DIV", "FF", "Active"])  # Firing rate dataframe
+for d in pd.unique(spkdf["DIV"]):  # DIV seperating
+    burst_array = []
+    day = spkdf.loc[spkdf['DIV'] == d, :]
+    for w in pd.unique(spkdf["Well Label"]):  # Well seperation
+        well = day.loc[day['Well Label'] == w, :]
 
-falling_threshold = -5 * noise_mad
-rising_threshold = 5 * noise_mad
+        for e in pd.unique(well["Channel Label"]):  # change to right object
+            elecdata = well.loc[well['Channel Label'] == e, :]
+            spks_in_range = elecdata.loc[elecdata['Timestamp [µs]'] > range_in_s[0] * 1e6, :]  # needs to be done in one line
+            spks_in_range = spks_in_range.loc[spks_in_range['Timestamp [µs]'] < range_in_s[1] * 1e6, :]  # ^
 
-print('Threshold : {0:g} V'.format(rising_threshold))
-print('Threshold : {0:g} V'.format(falling_threshold), "\n")
+            spk_int = np.diff(spks_in_range['Timestamp [µs]'])
+            if len(spk_int) > 10:
+                active += 1
 
-fs = int(electrode_stream.channel_infos[channel_id].sampling_frequency.magnitude)
-falling_crossings = detect_threshold_falling_crossings(signal, fs, falling_threshold, 0.003)
-rising_crossings = detect_threshold_rising_crossings(signal, fs, rising_threshold, 0.003)
-spks_fall = align_to_minimum(signal, fs, falling_crossings, 0.002)
-spks_rise = align_to_maximum(signal, fs, rising_crossings, 0.002)
+            list_row = [e, w, d, len(spks_in_range) / 300, active]  # NaNs are throwing errors
+            active = 0
+            FFdf.loc[len(FFdf)] = list_row  # adding row to the dataframe for graphing
 
-print("Rising edge spike count : %s" % len(spks_rise))
-print("Falling edge spike count : %s" % len(spks_fall))
-
-spks = np.sort(np.append(spks_fall, spks_rise))
-spks = detect_distance_minmax(spks, fs, 0.003)
-
-ts_rise = spks_rise / fs
-ts_fall = spks_fall / fs
-range_in_s = (timeStart, timeStop)
-falling_in_range = ts_fall[(ts_fall >= range_in_s[0]) & (ts_fall <= range_in_s[1])]
-rising_in_range = ts_rise[(ts_rise >= range_in_s[0]) & (ts_rise <= range_in_s[1])]
-
-plot_analog_stream_channel(electrode_stream, electrode_id, from_in_s=timeStart, to_in_s=timeStop, show=False)
-_ = plt.plot(falling_in_range, [falling_threshold * 1e6] * falling_in_range.shape[0], 'bo', ms=0.4)
-_ = plt.plot(rising_in_range, [rising_threshold * 1e6] * rising_in_range.shape[0], 'ro', ms=0.4)
+#----------------------------------------------------------------------------------------------------------------------#
+# Plotting Spks
+#----------------------------------------------------------------------------------------------------------------------#
+plt.title("Mean Firing Rate")
+plt.ylabel("Frequency [Hz]")
+c = 0
+for q in pd.unique(FFdf["Well"]):
+    x = FFdf.loc[FFdf["Well"] == q]
+    for _ in pd.unique(FFdf["Electrode"]):
+        y = x.loc[FFdf["Electrode"] == _]
+        plt.plot(y["DIV"], y["FF"], color=wellrainbow[c], alpha=0.3, lw=0.8)
+    c += 1
+plt.tight_layout()
 plt.show()
+#----------------------------------------------------------------------------------------------------------------------#
+# # Line plot
+# plt.title("Active Channels")
+# plt.ylabel("Active Channels")
+# c = 0
+# legend = []
+# for well in pd.unique(FFdf["Well"]):
+#     x = FFdf.loc[FFdf["Well"] == well]
+#     z = []
+#     for q in pd.unique(FFdf["DIV"]):
+#         y = x.loc[x["DIV"] == q]
+#         z.append(y["Active"].sum())
+#         legend.append(q)
+#     plt.plot(allDIVs, z, color=wellrainbow[c], alpha=0.5, lw=1.5, label=well, linestyle=':')
+#     plt.legend()
+#     c += 1
+# plt.tight_layout()
+# plt.show()
 
-pre = 0.002
-post = 0.002
-cutouts = extract_waveforms(signal, fs, spks, pre, post)
-print("Spike count : " + str(len(cutouts)))
-print(np.shape(cutouts))
+#----------------------------------------------------------------------------------------------------------------------#
+# Burst dataframe constrution
+#----------------------------------------------------------------------------------------------------------------------#
+# Reading in Burst data from the MCS software as csv into a pandas dataframe
+bdf = pd.read_csv(f'{rootDir}\\Hippocampus bursts analysis.csv')
+bdf = bdf.iloc[:, [1, 3, 6, 9, 10, 11, 12]]  # Channel Label, Well Label, Experiment, Start timestamp [µs], Duration [µs], Spike count, Spike Frequency [Hz]
+bdf['End timestamp [µs]'] = bdf['Start timestamp [µs]'] + bdf['Duration [µs]']  # Adding End timestamp [µs]
 
-print("-----------------------------------------------------------")
+# that's a neat piece of code
+bdf['Experiment'] = ['DIV04' if x == '20230516_Hippocampus_pMEA_001' else
+                       'DIV06' if x == '20230518_Hippocampus_pMEA_001' else
+                       'DIV08' if x == '20230520_Hippocampus_pMEA_001' else
+                       'DIV10' if x == '20230522_Hippocampus_pMEA_001' else
+                       'DIV12' if x == '20230524_Hippocampus_pMEA_001' else
+                       'DIV14' if x == '20230526_Hippocampus_pMEA_001' else
+                       'DIV18' if x == '20230530_Hippocampus_pMEA_001' else
+                       'DIV24' if x == '20230605_Hippocampus_pMEA_001' else 'nan' for x in bdf["Experiment"]]
 
-plot_waveforms(cutouts, fs, pre, post, n=500)
-
-"""
-Data analysis
-"""
-
-for i in electrode_stream.get_channel_data.shape[0]:
-    ids = [c.channel_id for c in electrode_stream.get_channel_in_range()]
+# Create a DataFrame with all possible combinations of dc, wc, and ec
+combos = pd.DataFrame([(dc, wc, ec) for dc in allDIVs for wc in allWells for ec in allElectrodes],
+                      columns=["Experiment", "Well Label", "Channel Label"])
+missing_combos = pd.merge(combos, bdf, on=["Experiment", "Well Label", "Channel Label"], how="left") # Merge to find missing combinations
+missing_combos = missing_combos[missing_combos.isnull().any(axis=1)]  # Isolate missing combinations based on NaN
+bdf = pd.concat([bdf, missing_combos], ignore_index=True, sort=False)
 
 
 
+#----------------------------------------------------------------------------------------------------------------------#
+# Analysis
+#----------------------------------------------------------------------------------------------------------------------#
+bdf['Duration [ms]'] = [x / 1e3 for x in bdf['Duration [µs]']]
+
+# dbstdf = pd.DataFrame(columns=["Electrode", "Well", "DIV", "Hz"])
+#
+# for d in pd.unique(bstdf["Experiment"]):  # DIV seperating
+#     burst_array = []
+#     day = bstdf.loc[bstdf['Experiment'] == d, :]
+#     for w in pd.unique(bstdf["Well Label"]):  # Well seperation
+#         well = day.loc[day['Well Label'] == w, :]
+#         for e in pd.unique(well["Channel Label"]):  # change to right object
+#             elecdata = well.loc[well['Channel Label'] == e, :]  # select rows only with right electrode label
+#
+#             if mt.isnan(np.mean(elecdata["Spike Frequency [Hz]"])) :
+#                 list_row = [e, w, d, 0]
+#                 dbstdf.loc[len(dbstdf)] = list_row
+#             else:
+#                 hz = np.mean(elecdata["Spike Frequency [Hz]"])
+#                 list_row = [e, w, d, hz]
+#                 dbstdf.loc[len(dbstdf)] = list_row
+
+#----------------------------------------------------------------------------------------------------------------------#
+# Plotting Bursts
+#----------------------------------------------------------------------------------------------------------------------#
+# Bar plot with pandas
+group = bdf.groupby(["Experiment"])[["Spike Count",
+                                       "Duration [ms]",
+                                       "Spike Frequency [Hz]"]].mean().plot(kind="bar", width=0.8, color=['#f09892',
+                                                                                                           '#95f099',
+                                                                                                           '#8db1eb'])
+plt.title("Burst")  # average burst rate of all wells/day
+plt.xlabel("")
+plt.ylim(bottom=0)
+plt.xticks(rotation=45)
+plt.tight_layout()
+
+plt.show()
