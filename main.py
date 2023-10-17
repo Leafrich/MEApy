@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import os
-import math as mt
 
 pd.set_option('display.max_columns', None)
 pd.set_option("expand_frame_repr", False)
@@ -125,17 +124,17 @@ for d in pd.unique(spkdf["DIV"]):  # DIV seperating
 #----------------------------------------------------------------------------------------------------------------------#
 # Plotting Spks
 #----------------------------------------------------------------------------------------------------------------------#
-plt.title("Mean Firing Rate")
-plt.ylabel("Frequency [Hz]")
-c = 0
-for q in pd.unique(FFdf["Well"]):
-    x = FFdf.loc[FFdf["Well"] == q]
-    for _ in pd.unique(FFdf["Electrode"]):
-        y = x.loc[FFdf["Electrode"] == _]
-        plt.plot(y["DIV"], y["FF"], color=wellrainbow[c], alpha=0.3, lw=0.8)
-    c += 1
-plt.tight_layout()
-plt.show()
+# plt.title("Mean Firing Rate")
+# plt.ylabel("Frequency [Hz]")
+# c = 0
+# for q in pd.unique(FFdf["Well"]):
+#     x = FFdf.loc[FFdf["Well"] == q]
+#     for _ in pd.unique(FFdf["Electrode"]):
+#         y = x.loc[FFdf["Electrode"] == _]
+#         plt.plot(y["DIV"], y["FF"], color=wellrainbow[c], alpha=0.3, lw=0.8)
+#     c += 1
+# plt.tight_layout()
+# plt.show()
 #----------------------------------------------------------------------------------------------------------------------#
 # # Line plot
 # plt.title("Active Channels")
@@ -210,10 +209,10 @@ bdf['Duration [ms]'] = [x / 1e3 for x in bdf['Duration [µs]']]
 #----------------------------------------------------------------------------------------------------------------------#
 # Bar plot with pandas
 group = bdf.groupby(["Experiment"])[["Spike Count",
-                                       "Duration [ms]",
-                                       "Spike Frequency [Hz]"]].mean().plot(kind="bar", width=0.8, color=['#f09892',
-                                                                                                           '#95f099',
-                                                                                                           '#8db1eb'])
+                                     "Duration [ms]",
+                                     "Spike Frequency [Hz]"]].mean().plot(kind="bar", width=0.8, color=['#f09892',
+                                                                                                        '#95f099',
+                                                                                                        '#8db1eb'])
 plt.title("Burst")  # average burst rate of all wells/day
 plt.xlabel("")
 plt.ylim(bottom=0)
