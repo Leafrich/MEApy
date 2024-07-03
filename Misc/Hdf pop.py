@@ -6,8 +6,8 @@ import numpy as np
 timeStart = 0
 timeStop = 120
 
-rootDir = os.path.dirname(os.path.abspath(__file__))
-D5data = f'{rootDir}\\wD6_D18_hc.h5'
+rootDir = os.path.dirname(os.path.abspath(os.path.join(__file__, "..")))
+D5data = f'{rootDir}\\Data\\wD6_D18_hc.h5'
 file = McsPy.McsData.RawData(D5data)
 electrode_stream = file.recordings[0].analog_streams[0]  # All data streams (incl wells and electrodes)
 
@@ -34,8 +34,6 @@ else:
     to_idx = min(electrode_stream.channel_data.shape[1], int(timeStop * sampling_frequency))
 
 lenSig = electrode_stream.get_channel_in_range(ids[0], from_idx, to_idx)
-
-
 
 # adapt size of array to maximum streams available
 sigArray = np.empty(shape=(12, len(lenSig[0])))

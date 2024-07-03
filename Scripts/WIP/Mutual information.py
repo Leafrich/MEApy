@@ -9,10 +9,8 @@ from math import log2
 #
 # print('entropy: %.3f bits' % entropy)
 
-
 def entropy(class0, class1):
     return -(class0 * log2(class0) + class1 * log2(class1))
-
 
 class0 = 13 / 20
 class1 = 7 / 20

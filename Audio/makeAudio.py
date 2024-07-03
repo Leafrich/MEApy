@@ -14,8 +14,8 @@ t = np.arange(0, 300, ts)
 electrodeID = 63
 
 # get the signal
-rootDir = os.path.dirname(os.path.abspath(__file__))
-D5data = f'{rootDir}\\Cx_DIV24.h5'
+rootDir = os.path.dirname(os.path.abspath(os.path.join(__file__ ,"..")))
+D5data = f'{rootDir}\\Data\\Cx_DIV24.h5'
 file = McsPy.McsData.RawData(D5data)
 electrode_stream = file.recordings[0].analog_streams[0]
 ids = [c.channel_id for c in electrode_stream.channel_infos.values()]

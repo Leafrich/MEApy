@@ -185,8 +185,8 @@ electrode_id = 6
 timeStart = 0
 timeStop = 30
 
-rootDir = os.path.dirname(os.path.abspath(__file__))
-D5data = f'{rootDir}\\Cx_DIV24.h5'
+rootDir = os.path.dirname(os.path.abspath(os.path.join(__file__, "..")))
+D5data = f'{rootDir}\\Data\\wD6_D18_hc.h5'
 file = McsPy.McsData.RawData(D5data)
 electrode_stream = file.recordings[0].analog_streams[0]
 ids = [c.channel_id for c in electrode_stream.channel_infos.values()]
@@ -211,7 +211,7 @@ yf[0 : target_idx - int(points_per_freq * 1000)] = 0
 
 new_sig = irfft(yf)
 
-plt.plot(signal, color='#9BD8BA', linewidth=0.3, alpha=0.5)
-plt.plot(new_sig, color='#e8736b', linewidth=0.3, alpha=0.5)
+plt.plot(signal, color='#9BD8BA', linewidth=0.3, alpha=0.8)
+plt.plot(new_sig, color='#e8736b', linewidth=0.3, alpha=0.8)
 plt.show()
 

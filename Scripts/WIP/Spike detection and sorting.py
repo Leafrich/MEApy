@@ -238,12 +238,12 @@ def plot_waveforms(cutouts, fs, pre, post, n=100, color='k', show=True):
         plt.show()
 
 
-electrode_id = 0
+electrode_id = 4
 timeStart = 0
 timeStop = 300
 
-rootDir = os.path.dirname(os.path.abspath(__file__))
-D5data = f'{rootDir}\\20230530_Cortex_pMEA.h5'
+rootDir = os.path.dirname(os.path.abspath(os.path.join(__file__, "../..")))
+D5data = f'{rootDir}\\Data\\Cx_50kHz.h5'
 file = McsPy.McsData.RawData(D5data)
 electrode_stream = file.recordings[0].analog_streams[0]
 ids = [c.channel_id for c in electrode_stream.channel_infos.values()]
@@ -282,18 +282,18 @@ print("Falling edge spike count : %s" % len(spks_fall))
 spks = np.sort(np.append(spks_fall, spks_rise))
 spks = detect_distance_minmax(spks, fs, 0.003)
 
-# ts_rise = spks_rise / fs
-# ts_fall = spks_fall / fs
+ts_rise = spks_rise / fs
+ts_fall = spks_fall / fs
 range_in_s = (timeStart, timeStop)
-# falling_in_range = ts_fall[(ts_fall >= range_in_s[0]) & (ts_fall <= range_in_s[1])]
-# rising_in_range = ts_rise[(ts_rise >= range_in_s[0]) & (ts_rise <= range_in_s[1])]
+falling_in_range = ts_fall[(ts_fall >= range_in_s[0]) & (ts_fall <= range_in_s[1])]
+rising_in_range = ts_rise[(ts_rise >= range_in_s[0]) & (ts_rise <= range_in_s[1])]
 
 ts_spks = spks / fs
 spks_in_range = ts_spks[(ts_spks >= range_in_s[0]) & (ts_spks <= range_in_s[1])]
 
 plot_analog_stream_channel(electrode_stream, electrode_id, from_in_s=timeStart, to_in_s=timeStop, show=False)
 _ = plt.plot(spks_in_range, [falling_threshold * 1e6] * spks_in_range.shape[0], 'bo', ms=0.4)
-# _ = plt.plot(rising_in_range, [rising_threshold * 1e6] * rising_in_range.shape[0], 'ro', ms=0.4)
+_ = plt.plot(rising_in_range, [rising_threshold * 1e6] * rising_in_range.shape[0], 'ro', ms=0.4)
 plt.show()
 
 pre = 0.002
@@ -317,9 +317,9 @@ plot_waveforms(cutouts, fs, pre, post, n=500)
 #
 # plt.show()
 
-"""
-PCA analysis
-"""
+#----------------------------------------------------------------------------------------------------------------------#
+# PCA analysis
+#----------------------------------------------------------------------------------------------------------------------#
 
 scaler = StandardScaler()
 scaled_cutouts = scaler.fit_transform(cutouts)
