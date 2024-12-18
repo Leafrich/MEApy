@@ -13,7 +13,6 @@ electrode_stream = file.recordings[0].analog_streams[0]  # All data streams (inc
 
 print(electrode_stream)
 
-# is this needed, considering I'm using all streams
 ids = [c.channel_id for c in electrode_stream.channel_infos.values()]
 channel_id = ids[0]
 

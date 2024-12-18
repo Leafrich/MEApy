@@ -9,7 +9,7 @@ pd.set_option("expand_frame_repr", False)
 #----------------------------------------------------------------------------------------------------------------------#
 # Variable setup
 #----------------------------------------------------------------------------------------------------------------------#
-range_in_s = (0, 300)  # range to be analysed in seconds [s]
+range_in_s = (0, 200)  # range to be analysed in seconds [s]
 allWells = ["A4", "A5", "B5", "C4", "C5", "D4", "D5"]
 allElectrodes = [12, 13, 21, 22, 23, 24, 31, 32, 33, 34, 42, 43]
 allDIVs = ['HDIV04', 'HDIV06', 'HDIV08', 'HDIV10', 'HDIV12', 'HDIV14', 'HDIV18', 'HDIV24',
@@ -66,36 +66,36 @@ for d in pd.unique(spkdf["DIV"]):  # DIV seperating
 
 #----------------------------------------------------------------------------------------------------------------------#
 # Plotting Spks
-#----------------------------------------------------------------------------------------------------------------------#
-# plt.title("Mean Firing Rate")
-# plt.ylabel("Frequency [Hz]")
-# c = 0
-# for q in pd.unique(FFdf["Well"]):
-#     x = FFdf.loc[FFdf["Well"] == q]
-#     for _ in pd.unique(FFdf["Electrode"]):
-#         y = x.loc[FFdf["Electrode"] == _]
-#         plt.plot(y["DIV"], y["FF"], color=wellrainbow[c], alpha=0.3, lw=0.8)
-#     c += 1
-# plt.tight_layout()
-# plt.show()
-# # ----------------------------------------------------------------------------------------------------------------------#
-# # Line plot
-# plt.title("Active Channels")
-# plt.ylabel("Active Channels")
-# c = 0
-# legend = []
-# for well in pd.unique(FFdf["Well"]):
-#     x = FFdf.loc[FFdf["Well"] == well]
-#     z = []
-#     for q in pd.unique(FFdf["DIV"]):
-#         y = x.loc[x["DIV"] == q]
-#         z.append(y["Active"].sum())
-#         legend.append(q)
-#     plt.plot(allDIVs, z, color=wellrainbow[c], alpha=0.5, lw=1.5, label=well, linestyle=':')
-#     plt.legend()
-#     c += 1
-# plt.tight_layout()
-# plt.show()
+# ----------------------------------------------------------------------------------------------------------------------#
+plt.title("Mean Firing Rate")
+plt.ylabel("Frequency [Hz]")
+c = 0
+for q in pd.unique(FFdf["Well"]):
+    x = FFdf.loc[FFdf["Well"] == q]
+    for _ in pd.unique(FFdf["Electrode"]):
+        y = x.loc[FFdf["Electrode"] == _]
+        plt.plot(y["DIV"], y["FF"], color=wellrainbow[c], alpha=0.3, lw=0.8)
+    c += 1
+plt.tight_layout()
+plt.show()
+# ----------------------------------------------------------------------------------------------------------------------#
+# Line plot
+plt.title("Active Channels")
+plt.ylabel("Active Channels")
+c = 0
+legend = []
+for well in pd.unique(FFdf["Well"]):
+    x = FFdf.loc[FFdf["Well"] == well]
+    z = []
+    for q in pd.unique(FFdf["DIV"]):
+        y = x.loc[x["DIV"] == q]
+        z.append(y["Active"].sum())
+        legend.append(q)
+    plt.plot(allDIVs, z, color=wellrainbow[c], alpha=0.5, lw=1.5, label=well, linestyle=':')
+    plt.legend()
+    c += 1
+plt.tight_layout()
+plt.show()
 
 #----------------------------------------------------------------------------------------------------------------------#
 # Burst dataframe constrution

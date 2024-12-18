@@ -62,5 +62,5 @@ print(np.shape(cutouts))
 print("-----------------------------------------------------------")
 
 plot_waveforms(cutouts, fs, pre, post, n=500)
-
+plt.show()
 
